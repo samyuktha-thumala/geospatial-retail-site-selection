@@ -9,8 +9,6 @@ The entire pipeline — from Census data ingestion to H3 hexagonal analysis to X
 
 ---
 
-## Architecture
-
 ![Architecture](docs/architecture.png)
 
 ### Stack
@@ -26,7 +24,6 @@ The entire pipeline — from Census data ingestion to H3 hexagonal analysis to X
 | **LLM** | Gemini 2.5 Flash via Databricks Foundation Model API |
 | **Deployment** | Databricks Apps, Databricks Asset Bundles (DABs) |
 
-### App Screenshots
 
 | Network Diagnostics | Site Playground |
 |---|---|
