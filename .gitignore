@@ -9,6 +9,10 @@ __pycache__/
 node_modules/
 .tanstack/
 *.tsbuildinfo
+dist/
+bun.lock
+package-lock.json
+uv.lock
 
 # Databricks
 .databricks/
