@@ -1,0 +1,70 @@
+resources:
+  jobs:
+    bronze_census_ingestion:
+      name: "Bronze - Census Demographics"
+
+      tasks:
+        - task_key: "ingest_census_demographics"
+          notebook_task:
+            notebook_path: ../../bronze/census_demographics.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              bronze_schema: "${var.schema}"
+              census_api_key: "${var.census_api_key}"
+              census_data_volume: "/Volumes/${var.catalog}/${var.schema}/census_data/"
+              config_path: "${workspace.file_path}/resources/configs/census_variables.yml"
+              acs_year: "${var.acs_year}"
+              state_fips: "${var.state_fips}"
+
+          # Serverless — %pip install in notebook
+          timeout_seconds: 3600
+          max_retries: 2
+
+        - task_key: "ingest_census_boundaries"
+          notebook_task:
+            notebook_path: ../../bronze/census_boundaries.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              bronze_schema: "${var.schema}"
+              boundary_data_volume: "/Volumes/${var.catalog}/${var.schema}/boundary_data/"
+              state_fips: "${var.state_fips}"
+              year: "${var.acs_year}"
+
+          # pygris + geopandas need native GDAL/GEOS — use existing cluster
+          existing_cluster_id: "0730-172948-runts698"
+
+          timeout_seconds: 3600
+          max_retries: 2
+
+        - task_key: "download_osm_data"
+          notebook_task:
+            notebook_path: ../../bronze/osm_download.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              bronze_schema: "${var.schema}"
+              osm_data_volume: "/Volumes/${var.catalog}/${var.schema}/osm_data/"
+              osm_url: "${var.osm_url}"
+              region: "${var.osm_region}"
+
+          # Serverless — no special deps
+          timeout_seconds: 3600
+          max_retries: 2
+
+        - task_key: "extract_pois"
+          depends_on:
+            - task_key: "download_osm_data"
+          notebook_task:
+            notebook_path: ../../bronze/extract_pois.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              bronze_schema: "${var.schema}"
+              osm_region: "${var.osm_region}"
+              config_path: "${workspace.file_path}/resources/configs/poi_config.yml"
+
+          # pyosmium needs native C++ bindings — use existing cluster
+          existing_cluster_id: "0730-172948-runts698"
+
+          timeout_seconds: 7200
+          max_retries: 2
+
+      max_concurrent_runs: 1

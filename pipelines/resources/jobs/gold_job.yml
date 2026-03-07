@@ -1,0 +1,133 @@
+resources:
+  jobs:
+    gold_feature_engineering:
+      name: "Gold - Feature Engineering & Sales"
+
+      tasks:
+        # Step 1: Create H3 feature grid from census + POI + competitor data
+        - task_key: "create_h3_features"
+          notebook_task:
+            notebook_path: ../../silver/create_h3_features.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              bronze_schema: "${var.schema}"
+              silver_schema: "${var.schema}"
+              gold_schema: "${var.schema}"
+              state_fips: "${var.state_fips}"
+              config_path: "${workspace.file_path}/resources/configs/h3_features_config.yml"
+
+          timeout_seconds: 7200
+          max_retries: 2
+
+        # Step 2: Generate seed points from H3 features
+        - task_key: "generate_seed_points"
+          depends_on:
+            - task_key: "create_h3_features"
+          notebook_task:
+            notebook_path: ../../silver/generate_seed_points.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "${var.schema}"
+
+          timeout_seconds: 3600
+          max_retries: 2
+
+        # Step 3: Generate isochrones for seed points
+        - task_key: "create_seed_point_isochrones"
+          depends_on:
+            - task_key: "generate_seed_points"
+          notebook_task:
+            notebook_path: ../../silver/create_isochrones_valhalla.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              bronze_schema: "${var.schema}"
+              silver_schema: "${var.schema}"
+              gold_schema: "${var.schema}"
+              config_path: "${workspace.file_path}/resources/configs/isochrone_config.yml"
+              input_table: "${var.catalog}.${var.schema}.silver_seed_points"
+              output_table_override: "seed_point_isochrones"
+              skip_setup: "yes"
+
+          timeout_seconds: 7200
+          max_retries: 2
+
+        # Step 4a: Aggregate H3 features within store isochrones
+        - task_key: "aggregate_store_trade_area_features"
+          depends_on:
+            - task_key: "create_h3_features"
+          notebook_task:
+            notebook_path: ../../gold/aggregate_trade_area_features.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "${var.schema}"
+
+          timeout_seconds: 3600
+          max_retries: 2
+
+        # Step 4b: Aggregate H3 features within seed point isochrones
+        - task_key: "aggregate_seed_trade_area_features"
+          depends_on:
+            - task_key: "create_seed_point_isochrones"
+          notebook_task:
+            notebook_path: ../../gold/aggregate_seed_trade_area_features.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "${var.schema}"
+
+          timeout_seconds: 3600
+          max_retries: 2
+
+        # Step 5: Generate store sales from trade area features
+        - task_key: "generate_store_sales"
+          depends_on:
+            - task_key: "aggregate_store_trade_area_features"
+          notebook_task:
+            notebook_path: ../../gold/generate_store_sales.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "${var.schema}"
+
+          timeout_seconds: 3600
+          max_retries: 2
+
+        # Step 6: Simulate competitor growth
+        - task_key: "simulate_competitor_growth"
+          depends_on:
+            - task_key: "create_h3_features"
+          notebook_task:
+            notebook_path: ../../gold/simulate_competitor_growth.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "${var.schema}"
+
+          timeout_seconds: 3600
+          max_retries: 2
+
+        # Step 7: Train XGBoost sales prediction model
+        - task_key: "train_sales_model"
+          depends_on:
+            - task_key: "generate_store_sales"
+          notebook_task:
+            notebook_path: ../../gold/train_sales_model.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "${var.schema}"
+
+          timeout_seconds: 3600
+          max_retries: 2
+
+        # Step 8: Predict seed point sales using trained model
+        - task_key: "predict_seed_sales"
+          depends_on:
+            - task_key: "train_sales_model"
+            - task_key: "aggregate_seed_trade_area_features"
+          notebook_task:
+            notebook_path: ../../gold/predict_seed_sales.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "${var.schema}"
+
+          timeout_seconds: 3600
+          max_retries: 2
+
+      max_concurrent_runs: 1

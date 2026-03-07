@@ -1,0 +1,123 @@
+# H3 Feature Engineering Configuration
+# Configuration for creating H3-based features for site selection
+# Version: 1.0
+# Last Updated: 2025-11-14
+
+# H3 Grid Configuration
+h3_grid:
+  resolution: 8  # H3 resolution (8 = ~0.737 km² per cell)
+  grid_sampling:
+    lat_step: 0.01  # Degrees (~1 km)
+    lon_step: 0.01  # Degrees (~1 km)
+
+# Demographic Variables to Aggregate
+demographic_variables:
+  # Population variables (counts)
+  population:
+    - total_population
+    - male_under_5
+    - female_under_5
+    - male_18_to_24
+    - female_18_to_24
+    - male_45_to_54
+    - female_45_to_54
+    - male_65_to_74
+    - female_65_to_74
+
+  # Income variables (counts)
+  income:
+    # - per_capita_income
+    - income_less_10k
+    - income_10k_15k
+    - income_15k_20k
+    - income_20k_25k
+    - income_25k_30k
+    - income_30k_35k
+    - income_35k_40k
+    - income_40k_45k
+    - income_45k_50k
+    - income_50k_60k
+    - income_60k_75k
+    - income_75k_100k
+    - income_100k_125k
+    - income_125k_150k
+    - income_150k_200k
+    - income_200k_plus
+
+  # Median variables (require special weighted averaging)
+  median:
+    - median_household_income
+    - median_home_value
+    - median_gross_rent
+
+  # Household variables
+  households:
+    - total_households
+
+  # Education variables
+  education:
+    - high_school_grad
+    - bachelors_degree
+    - masters_degree
+    - professional_degree
+    - doctorate_degree
+
+  # Employment variables
+  employment:
+    - in_labor_force
+    - employed
+    - not_in_labor_force
+    - unemployment_count
+
+  # Housing variables
+  housing:
+    - vacant_housing_units
+
+  # Commute variables
+  commute:
+    - total_commuters
+    - commute_under_10_min
+    - commute_30_44_min
+    - commute_60_89_min
+    - commute_90_plus_min
+
+# Urbanicity Score Configuration
+urbanicity:
+  weights:
+    population_density: 0.6  # Weight for population density (60%)
+    poi_count: 0.4           # Weight for POI count (40%)
+
+  normalization:
+    method: "min_max"  # Min-max normalization to 0-1 scale
+
+# Distance Calculation Configuration
+distance:
+  units: "kilometers"  # Output distance units
+  null_value: 999999   # Fill value for cells with no nearby locations
+
+  # Competitor brands to calculate distances for
+  competitor_brands:
+    - Competitor A
+    - Competitor B
+    - Competitor C
+    - Competitor D
+    - Competitor E
+
+# Performance Configuration
+performance:
+  cache_intermediate_results: true
+  broadcast_threshold_mb: 100  # Tables smaller than this will be broadcast
+
+  # DataFrames to cache
+  cache:
+    - h3_base_df
+    - h3_centers_df
+    - competitors_df
+
+# Output Configuration
+output:
+  table_name: "silver_h3_features"
+  write_mode: "overwrite"
+  optimize_write: true
+  auto_compact: true
+  include_timestamp: true

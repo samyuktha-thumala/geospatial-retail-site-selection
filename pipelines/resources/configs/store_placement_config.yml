@@ -1,0 +1,125 @@
+# Store Placement Configuration
+# Defines MSA targets, format placement rules, and competitor settings
+
+# Target MSAs with approximate store allocations
+# Total: ~1,500 stores
+msas:
+  - name: "New York"
+    states: ["NY", "NJ", "CT"]
+    center: [40.7128, -74.0060]
+    stores: 180
+  - name: "Los Angeles"
+    states: ["CA"]
+    center: [34.0522, -118.2437]
+    stores: 150
+  - name: "Chicago"
+    states: ["IL", "IN", "WI"]
+    center: [41.8781, -87.6298]
+    stores: 120
+  - name: "Houston"
+    states: ["TX"]
+    center: [29.7604, -95.3698]
+    stores: 90
+  - name: "Phoenix"
+    states: ["AZ"]
+    center: [33.4484, -112.0740]
+    stores: 80
+  - name: "Philadelphia"
+    states: ["PA", "NJ", "DE"]
+    center: [39.9526, -75.1652]
+    stores: 75
+  - name: "Dallas"
+    states: ["TX"]
+    center: [32.7767, -96.7970]
+    stores: 90
+  - name: "San Diego"
+    states: ["CA"]
+    center: [32.7157, -117.1611]
+    stores: 60
+  - name: "San Antonio"
+    states: ["TX"]
+    center: [29.4241, -98.4936]
+    stores: 60
+  - name: "Austin"
+    states: ["TX"]
+    center: [30.2672, -97.7431]
+    stores: 50
+  - name: "Denver"
+    states: ["CO"]
+    center: [39.7392, -104.9903]
+    stores: 50
+  - name: "Seattle"
+    states: ["WA"]
+    center: [47.6062, -122.3321]
+    stores: 60
+  - name: "Boston"
+    states: ["MA", "RI", "NH"]
+    center: [42.3601, -71.0589]
+    stores: 60
+  - name: "Atlanta"
+    states: ["GA"]
+    center: [33.7490, -84.3880]
+    stores: 75
+  - name: "Miami"
+    states: ["FL"]
+    center: [25.7617, -80.1918]
+    stores: 70
+  - name: "Minneapolis"
+    states: ["MN"]
+    center: [44.9778, -93.2650]
+    stores: 40
+  - name: "Portland"
+    states: ["OR"]
+    center: [45.5152, -122.6784]
+    stores: 40
+  - name: "Nashville"
+    states: ["TN"]
+    center: [36.1627, -86.7816]
+    stores: 40
+  - name: "Charlotte"
+    states: ["NC"]
+    center: [35.2271, -80.8431]
+    stores: 35
+  - name: "Washington DC"
+    states: ["DC", "VA", "MD"]
+    center: [38.9072, -77.0369]
+    stores: 75
+
+# Format distribution
+formats:
+  express:
+    count_pct: 0.33  # ~500
+    placement:
+      prefer_poi_categories: ["amenity_fuel", "amenity_fast_food", "building_university"]
+      urbanicity_preference: ["urban", "suburban"]
+      min_population_density: 500
+  standard:
+    count_pct: 0.47  # ~700
+    placement:
+      prefer_poi_categories: ["shop_supermarket", "shop_convenience", "shop_mall"]
+      urbanicity_preference: ["suburban", "urban"]
+      min_population_density: 1000
+  flagship:
+    count_pct: 0.20  # ~300
+    placement:
+      prefer_poi_categories: ["shop_department_store", "amenity_restaurant"]
+      urbanicity_preference: ["urban"]
+      min_population_density: 3000
+
+# Competitor configuration (anonymized)
+competitors:
+  - brand: "Competitor A"
+    count: 1500
+    placement: "broad"  # Similar to standard placement
+  - brand: "Competitor B"
+    count: 1200
+    placement: "urban"  # Urban-focused
+  - brand: "Competitor C"
+    count: 900
+    placement: "regional"  # Regional clusters
+  - brand: "Competitor D"
+    count: 800
+    placement: "suburban"  # Suburban focus
+  - brand: "Competitor E"
+    count: 600
+    placement: "niche"  # Niche markets

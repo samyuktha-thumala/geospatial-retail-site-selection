@@ -1,0 +1,27 @@
+resources:
+  jobs:
+    site_selection_pipeline:
+      name: "Site Selection - Full Pipeline"
+
+      tasks:
+        - task_key: "run_bronze_ingestion"
+          run_job_task:
+            job_id: ${resources.jobs.bronze_census_ingestion.id}
+
+        - task_key: "run_silver_processing"
+          depends_on:
+            - task_key: "run_bronze_ingestion"
+          run_job_task:
+            job_id: ${resources.jobs.silver_processing.id}
+
+        - task_key: "run_gold_feature_engineering"
+          depends_on:
+            - task_key: "run_silver_processing"
+          run_job_task:
+            job_id: ${resources.jobs.gold_feature_engineering.id}
+
+      max_concurrent_runs: 1
+
+      tags:
+        pipeline: "site_selection"
+        layer: "orchestration"

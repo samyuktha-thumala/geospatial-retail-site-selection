@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+
+# Node / Frontend
+node_modules/
+.tanstack/
+*.tsbuildinfo
+
+# Databricks
+.databricks/
+.databricks-resources.json
+
+# IDE
+.vscode/
+.cursor/
+.idea/
+
+# OS
+.DS_Store
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# AI tooling (local only)
+.ai-dev-kit/
+.mcp.json
+.claude/
+.github/
+
+# Local docs
+IMPLEMENTATION_PLAN.md
+REFACTORING_PLAN.md
+claude_errors.md
+README.md

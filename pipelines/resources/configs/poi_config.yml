@@ -1,0 +1,63 @@
+# POI Extraction and Cleaning Configuration
+# Configuration for OpenStreetMap Point of Interest processing
+# Version: 1.0
+
+poi_extraction:
+  # Extract all POIs (set to true) or filter by specific tags (set to false)
+  extract_all: true
+
+  # POI tag categories to extract (only used if extract_all is false)
+  poi_tag_categories:
+    - shop
+    - amenity
+    - leisure
+    - tourism
+    - office
+    - public_transport
+    - railway
+
+poi_cleaning:
+  # POI ID prefix
+  poi_id_prefix: "poi_"
+
+  # Category extraction priority order
+  category_priority:
+    - shop
+    - amenity
+    - leisure
+    - tourism
+    - office
+    - public_transport
+    - railway
+
+  # Address field names (OSM standard)
+  address_fields:
+    - addr:housenumber
+    - addr:street
+    - addr:city
+    - addr:state
+    - addr:postcode
+
+  # State filtering tag names
+  state_filter_tags:
+    - addr:state
+    - is_in:state
+
+  # Coordinate validation bounds (standard lat/lon bounds)
+  coordinate_bounds:
+    latitude_min: -90
+    latitude_max: 90
+    longitude_min: -180
+    longitude_max: 180
+
+
+table_names:
+  # Bronze layer table suffix
+  bronze_raw_suffix: "osm_pois_raw"
+
+  # Silver layer table suffix
+  silver_cleaned_suffix: "osm_pois"
+
+paths:
+  # Temporary file path for OSM processing
+  temp_path: "/dbfs/tmp"

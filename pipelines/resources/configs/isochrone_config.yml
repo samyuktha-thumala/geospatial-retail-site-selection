@@ -1,0 +1,70 @@
+# Isochrone Generation Configuration
+# Configuration for OSRM routing and trade area isochrone generation
+# Version: 2.1 (OSRM-based with Urbanicity Support)
+# Last Updated: 2025-11-14
+
+# OSRM Configuration
+osrm:
+  # OSRM HTTP endpoint URL
+  # Replace with your OSRM server URL after deployment
+  # Examples:
+  #   - Local development: "http://localhost:5000"
+  #   - Azure VM: "http://your-vm-ip:5000"
+  #   - Load balancer: "http://osrm-lb.internal:5000"
+  endpoint_url: "http://localhost:5000"
+
+  # Routing profile (vehicle type)
+  # Options: driving, walking, cycling
+  profile: "driving"
+
+  # HTTP request timeout in seconds
+  timeout_seconds: 30
+
+# Isochrone Generation Configuration
+isochrone:
+  # Drive time buckets in minutes
+  drive_time_buckets: [5, 10, 15, 20, 30]
+
+  # Input location tables (informational — actual tables come from job parameters)
+  input_tables:
+    stores: "bronze_store_locations"
+    seed_points: "silver_seed_points"
+
+  # Output table names (will be created in Silver schema)
+  output_tables:
+    stores: "silver_store_isochrones"
+    seed_points: "silver_seed_point_isochrones"
+
+# Urbanicity-Based Routing Configuration
+# Dynamically assigns drive times based on urbanicity category from h3_features_gold
+urbanicity_routing:
+  # Enable urbanicity-based routing (set to false to use standard drive_time_buckets)
+  enabled: true
+
+  # H3 features table containing urbanicity_category (informational — actual table from job params)
+  h3_features_table: "silver_h3_features"
+
+  # Drive time in minutes for each urbanicity category
+  # Categories: urban, suburban, rural (from silver_h3_features.urbanicity_category)
+  drive_times:
+    urban: 10      # Urban areas: 10 minute trade areas
+    suburban: 20   # Suburban areas: 20 minute trade areas
+    rural: 30      # Rural areas: 30 minute trade areas
+    default: 15    # Default drive time if urbanicity cannot be determined
+
+  # Output table for urbanicity-based isochrones
+  output_table: "silver_store_isochrones"
+
+# Performance Configuration
+performance:
+  # Repartition factor for distributed processing
+  # Actual partitions = sc.defaultParallelism * repartition_factor
+  # Higher values = more parallelism but more HTTP connections to OSRM
+  repartition_factor: 8
+
+# Output Schema Configuration
+output:
+  write_mode: "overwrite"
+  include_area: true  # Calculate and include area_sqkm
+  include_metadata: true  # Include created_timestamp
+  include_urbanicity_info: true  # Include urbanicity_score and urbanicity_category in output

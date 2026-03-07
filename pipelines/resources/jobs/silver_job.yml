@@ -1,0 +1,64 @@
+resources:
+  jobs:
+    silver_processing:
+      name: "Silver - Enrichment & Isochrones"
+
+      tasks:
+        # Step 1a: Clean census demographics (null fill, derive rates, handle top-coded income)
+        - task_key: "clean_census_demographics"
+          notebook_task:
+            notebook_path: ../../silver/clean_census_demographics.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "${var.schema}"
+              state_fips: "${var.state_fips}"
+
+          timeout_seconds: 3600
+          max_retries: 2
+
+        # Step 1b: ZCTA boundaries + demographics → silver_census_zcta
+        - task_key: "ingest_census_zcta"
+          notebook_task:
+            notebook_path: ../../silver/census_zcta.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              schema: "${var.schema}"
+              census_api_key: "${var.census_api_key}"
+              state_fips: "${var.state_fips}"
+              acs_year: "${var.acs_year}"
+
+          timeout_seconds: 3600
+          max_retries: 2
+
+        # Step 2: Clean and filter POIs (independent of ZCTA)
+        - task_key: "clean_pois"
+          notebook_task:
+            notebook_path: ../../silver/clean_pois.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              bronze_schema: "${var.schema}"
+              silver_schema: "${var.schema}"
+              state_filter: "${var.state_filter}"
+              config_path: "${workspace.file_path}/resources/configs/poi_config.yml"
+
+          timeout_seconds: 3600
+          max_retries: 2
+
+        # Step 3: Generate isochrones (urbanicity derived inline from ZCTA join)
+        - task_key: "create_store_competitor_isochrones"
+          depends_on:
+            - task_key: "ingest_census_zcta"
+          notebook_task:
+            notebook_path: ../../silver/create_isochrones_valhalla.py
+            base_parameters:
+              catalog: "${var.catalog}"
+              bronze_schema: "${var.schema}"
+              silver_schema: "${var.schema}"
+              gold_schema: "${var.schema}"
+              config_path: "${workspace.file_path}/resources/configs/isochrone_config.yml"
+              skip_setup: "yes"
+
+          timeout_seconds: 7200
+          max_retries: 2
+
+      max_concurrent_runs: 1

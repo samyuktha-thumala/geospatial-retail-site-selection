@@ -1,0 +1,95 @@
+bundle:
+  name: geospatial-site-selection
+
+include:
+  - resources/jobs/bronze_job.yml
+  - resources/jobs/silver_job.yml
+  - resources/jobs/gold_job.yml
+  - resources/jobs/orchestration_job.yml
+  - resources/jobs/catalog_setup.yml
+
+# Sync configuration files to workspace
+sync:
+  include:
+    - "resources/configs/*.yml"
+
+targets:
+  prod:
+    default: true
+    mode: production
+    workspace:
+      host: https://e2-demo-west.cloud.databricks.com
+      root_path: /Workspace/Users/samyuktha.thumala@databricks.com/Store-Site-Selection
+    variables:
+      catalog: retail_consumer_goods
+      schema: geospatial_site_selection
+      census_api_key: "7f801eabbdf7763d74330e776061901753eb2878"
+      state_fips: "36"
+      osm_url: "https://download.geofabrik.de/north-america/us/new-york-latest.osm.pbf"
+      osm_region: "new-york"
+
+variables:
+  # Unity Catalog
+  catalog:
+    description: "Unity Catalog name"
+
+  schema:
+    description: "Schema name within catalog"
+
+  # Census API Configuration
+  census_api_key:
+    description: "US Census Bureau API key (get free at api.census.gov/data/key_signup.html)"
+    default: ""
+
+  acs_year:
+    description: "ACS 5-Year ending year"
+    default: "2023"
+
+  state_fips:
+    description: "Comma-separated state FIPS codes, or 'all' for nationwide"
+    default: "all"
+
+  # OSM Configuration
+  osm_url:
+    description: "Geofabrik OSM download URL"
+    default: "https://download.geofabrik.de/north-america/us-latest.osm.pbf"
+
+  osm_region:
+    description: "OSM region name"
+    default: "us"
+
+  # Cluster Configuration
+  node_type:
+    description: "Databricks node type"
+    default: "m5d.xlarge"
+
+  # Isochrone Configuration
+  drive_time_buckets:
+    description: "Comma-separated list of drive time buckets in minutes"
+    default: "5,10,15,20,30"
+
+  time_limit_minutes:
+    description: "Maximum search time limit in minutes"
+    default: "40"
+
+  tolerance_meters:
+    description: "Geometry simplification tolerance in meters"
+    default: "50"
+
+  isochrone_input_table:
+    description: "Full table name for isochrone input"
+    default: ""
+
+  isochrone_output_table_name:
+    description: "Output table name (with silver_ prefix)"
+    default: "silver_store_isochrones"
+
+  # POI Configuration
+  state_filter:
+    description: "State filter for POI extraction (e.g., MA for Massachusetts). Leave empty to process entire country."
+    default: ""
+
+  # Notifications
+  user_email:
+    description: "Email address for job notifications"
+    default: "samyuktha.thumala@databricks.com"

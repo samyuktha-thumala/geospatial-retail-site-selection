@@ -1,0 +1,30 @@
+resources:
+  # Single schema structure - all tables under site_selection schema
+  volumes:
+    census_data_volume:
+      name: "census_data"
+      catalog_name: "${var.catalog}"
+      schema_name: "${var.schema}"
+      volume_type: "MANAGED"
+      comment: "Raw Census Bureau API data (demographics, boundaries)"
+
+    osm_data_volume:
+      name: "osm_data"
+      catalog_name: "${var.catalog}"
+      schema_name: "${var.schema}"
+      volume_type: "MANAGED"
+      comment: "Raw OpenStreetMap road network data"
+
+    boundary_data_volume:
+      name: "boundary_data"
+      catalog_name: "${var.catalog}"
+      schema_name: "${var.schema}"
+      volume_type: "MANAGED"
+      comment: "Census geospatial boundary files"
+
+    valhalla_data_volume:
+      name: "valhalla_data"
+      catalog_name: "${var.catalog}"
+      schema_name: "${var.schema}"
+      volume_type: "MANAGED"
+      comment: "Compiled Valhalla routing tiles for isochrone generation"
