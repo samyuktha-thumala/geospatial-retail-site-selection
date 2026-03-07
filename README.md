@@ -4,9 +4,6 @@
 
 The entire pipeline — from Census data ingestion to H3 hexagonal analysis to XGBoost revenue prediction — runs on Databricks with Unity Catalog governance. The app itself is a full-stack Databricks App with a FastAPI backend and React frontend, deployed via Databricks Asset Bundles.
 
-## Demo
-
-
 ---
 
 ![Architecture](docs/architecture.png)
