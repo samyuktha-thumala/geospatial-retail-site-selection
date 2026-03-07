@@ -1,0 +1,19 @@
+command:
+  - "python"
+  - "-m"
+  - "uvicorn"
+  - "backend.main:app"
+  - "--host"
+  - "0.0.0.0"
+  - "--port"
+  - "8000"
+
+env:
+  - name: APP_ENV
+    value: "production"
+  - name: DATABRICKS_WAREHOUSE_ID
+    value: "75fd8278393d07eb"
+  - name: DATABRICKS_CATALOG
+    value: "retail_consumer_goods"
+  - name: DATABRICKS_SCHEMA
+    value: "geospatial_site_selection"

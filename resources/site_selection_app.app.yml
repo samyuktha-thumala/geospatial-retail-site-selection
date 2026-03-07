@@ -1,0 +1,6 @@
+resources:
+  apps:
+    site_selection_app:
+      name: site-selection-${bundle.target}
+      description: "Retail Site Selection Platform for Strategic Expansion"
+      source_code_path: ../app

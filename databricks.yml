@@ -1,0 +1,21 @@
+bundle:
+  name: site-selection-accelerator
+
+include:
+  - resources/*.yml
+
+variables:
+  warehouse_id:
+    default: "default-warehouse"
+
+targets:
+  dev:
+    default: true
+    mode: development
+    workspace:
+      profile: e2-demo-west
+  prod:
+    mode: production
+    workspace:
+      profile: e2-demo-west
+      root_path: /Workspace/Users/samyuktha.thumala@databricks.com/.bundle/${bundle.name}/${bundle.target}

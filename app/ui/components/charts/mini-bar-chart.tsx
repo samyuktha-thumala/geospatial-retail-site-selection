@@ -1,0 +1,49 @@
+"use client";
+
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+
+interface MiniBarChartProps {
+  data: { label: string; value: number }[];
+  color?: string;
+}
+
+export function MiniBarChart({ data, color = "#3b82f6" }: MiniBarChartProps) {
+  return (
+    <div className="w-full bg-slate-50 rounded-lg p-2">
+      <ResponsiveContainer width="100%" height={220}>
+        <BarChart data={data} margin={{ top: 4, right: 8, bottom: 4, left: -10 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+          <XAxis
+            dataKey="label"
+            tick={{ fill: "#64748b", fontSize: 10 }}
+            axisLine={{ stroke: "#e2e8f0" }}
+            tickLine={false}
+          />
+          <YAxis
+            tick={{ fill: "#64748b", fontSize: 10 }}
+            axisLine={false}
+            tickLine={false}
+            width={35}
+          />
+          <Tooltip
+            contentStyle={{
+              backgroundColor: "#ffffff",
+              border: "1px solid #e2e8f0",
+              borderRadius: "0.5rem",
+              color: "#1e293b",
+              fontSize: 11,
+              boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+            }}
+            labelStyle={{ color: "#64748b" }}
+          />
+          <Bar
+            dataKey="value"
+            fill={color}
+            radius={[3, 3, 0, 0]}
+            isAnimationActive={false}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}

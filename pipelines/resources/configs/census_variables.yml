@@ -1,0 +1,77 @@
+# Census ACS 5-Year Variables Configuration
+# Comprehensive demographic variables for site selection
+# Version: 1.0
+# Last Updated: 2025-10-29
+
+acs_5_year_variables:
+  # Population & Age
+  population:
+    B01003_001E: total_population
+    B01002_001E: median_age
+    B01001_003E: male_under_5
+    B01001_027E: female_under_5
+    B01001_007E: male_18_to_24
+    B01001_031E: female_18_to_24
+    B01001_013E: male_45_to_54
+    B01001_037E: female_45_to_54
+    B01001_016E: male_65_to_74
+    B01001_040E: female_65_to_74
+
+  # Income
+  income:
+    B19013_001E: median_household_income
+    B19301_001E: per_capita_income
+    B19001_002E: income_less_10k
+    B19001_003E: income_10k_15k
+    B19001_004E: income_15k_20k
+    B19001_005E: income_20k_25k
+    B19001_006E: income_25k_30k
+    B19001_007E: income_30k_35k
+    B19001_008E: income_35k_40k
+    B19001_009E: income_40k_45k
+    B19001_010E: income_45k_50k
+    B19001_011E: income_50k_60k
+    B19001_012E: income_60k_75k
+    B19001_013E: income_75k_100k
+    B19001_014E: income_100k_125k
+    B19001_015E: income_125k_150k
+    B19001_016E: income_150k_200k
+    B19001_017E: income_200k_plus
+
+  # Households
+  households:
+    B11001_001E: total_households
+    B25001_001E: total_housing_units
+    B25003_002E: owner_occupied
+    B25003_003E: renter_occupied
+
+  # Education
+  education:
+    B15003_017E: high_school_grad
+    B15003_022E: bachelors_degree
+    B15003_023E: masters_degree
+    B15003_024E: professional_degree
+    B15003_025E: doctorate_degree
+
+  # Employment
+  employment:
+    B23025_002E: in_labor_force
+    B23025_005E: employed
+    B23025_007E: not_in_labor_force
+    B23025_004E: unemployment_count
+
+  # Housing
+  housing:
+    B25077_001E: median_home_value
+    B25002_003E: vacant_housing_units
+    B25064_001E: median_gross_rent
+
+
+  # Commute
+  commute:
+    B08303_001E: total_commuters
+    B08301_010E: public_transit_commuters
+    B08303_002E: commute_under_10_min
+    B08303_008E: commute_30_44_min
+    B08303_012E: commute_60_89_min
+    B08303_013E: commute_90_plus_min
