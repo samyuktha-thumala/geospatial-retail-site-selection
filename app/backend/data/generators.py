@@ -15,23 +15,23 @@ from ..models import (
 
 random.seed(42)
 
-# Major US MSAs with approximate center coordinates
+# New York State metro areas and cities
 MSAS = [
-    ("New York", 40.7128, -74.0060),
-    ("Los Angeles", 34.0522, -118.2437),
-    ("Chicago", 41.8781, -87.6298),
-    ("Houston", 29.7604, -95.3698),
-    ("Phoenix", 33.4484, -112.0740),
-    ("Philadelphia", 39.9526, -75.1652),
-    ("San Antonio", 29.4241, -98.4936),
-    ("San Diego", 32.7157, -117.1611),
-    ("Dallas", 32.7767, -96.7970),
-    ("Austin", 30.2672, -97.7431),
-    ("Denver", 39.7392, -104.9903),
-    ("Seattle", 47.6062, -122.3321),
-    ("Boston", 42.3601, -71.0589),
-    ("Atlanta", 33.7490, -84.3880),
-    ("Miami", 25.7617, -80.1918),
+    ("Manhattan", 40.7580, -73.9855),
+    ("Brooklyn", 40.6782, -73.9442),
+    ("Queens", 40.7282, -73.7949),
+    ("Bronx", 40.8448, -73.8648),
+    ("Staten Island", 40.5795, -74.1502),
+    ("Long Island", 40.7891, -73.1350),
+    ("Westchester", 41.0340, -73.7629),
+    ("Albany", 42.6526, -73.7562),
+    ("Buffalo", 42.8864, -78.8784),
+    ("Rochester", 43.1566, -77.6088),
+    ("Syracuse", 43.0481, -76.1474),
+    ("Yonkers", 40.9312, -73.8987),
+    ("White Plains", 41.0340, -73.7629),
+    ("New Rochelle", 40.9115, -73.7824),
+    ("Poughkeepsie", 41.7004, -73.9210),
 ]
 
 COMPETITOR_BRANDS = ["Target", "Walmart", "Costco", "Whole Foods", "Trader Joe's"]
@@ -235,7 +235,7 @@ def generate_data_sources() -> list[DataSourceOut]:
                 DataSourceStat(key="Active Stores", value="148"),
                 DataSourceStat(key="Avg Store Age", value="8.3 yrs"),
                 DataSourceStat(key="Avg Sq. Footage", value="1,850"),
-                DataSourceStat(key="States Covered", value="32"),
+                DataSourceStat(key="Regions Covered", value="15"),
             ],
             chart_data=[
                 ChartDataPoint(label="Express", value=62),
@@ -304,7 +304,7 @@ def generate_data_sources() -> list[DataSourceOut]:
                 DataSourceStat(key="Retail POIs", value="89,420"),
                 DataSourceStat(key="Food & Dining", value="67,310"),
                 DataSourceStat(key="Avg POI Density", value="142/mi²"),
-                DataSourceStat(key="Coverage Area", value="32 states"),
+                DataSourceStat(key="Coverage Area", value="New York State"),
                 DataSourceStat(key="Last OSM Update", value="2026-02-28"),
             ],
             chart_data=[
@@ -438,7 +438,7 @@ def generate_alerts() -> list[AlertOut]:
             id=1,
             type=AlertType.WARNING,
             title="High Closure Risk Detected",
-            message="3 locations in the Phoenix MSA have exceeded the 80% closure risk threshold. Recommend immediate review.",
+            message="3 locations in the Buffalo MSA have exceeded the 80% closure risk threshold. Recommend immediate review.",
             time="2 hours ago",
             severity=AlertSeverity.HIGH,
         ),
@@ -446,7 +446,7 @@ def generate_alerts() -> list[AlertOut]:
             id=2,
             type=AlertType.WARNING,
             title="Competitor Expansion Alert",
-            message="Starbucks has filed permits for 5 new locations within your primary trade areas in Dallas and Austin.",
+            message="Starbucks has filed permits for 5 new locations within your primary trade areas in Brooklyn and Queens.",
             time="6 hours ago",
             severity=AlertSeverity.MEDIUM,
         ),
