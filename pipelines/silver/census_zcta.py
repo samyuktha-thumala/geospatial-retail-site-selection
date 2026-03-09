@@ -14,7 +14,7 @@
 dbutils.widgets.text("catalog", "")
 dbutils.widgets.text("schema", "")
 dbutils.widgets.text("census_api_key", "")
-dbutils.widgets.text("state_fips", "")
+dbutils.widgets.text("state_fips", "36")
 dbutils.widgets.text("acs_year", "2023")
 
 catalog = dbutils.widgets.get("catalog")
