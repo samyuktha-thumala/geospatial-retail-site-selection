@@ -38,7 +38,8 @@ COMPETITOR_BRANDS = ["Target", "Walmart", "Costco", "Whole Foods", "Trader Joe's
 
 FORMATS = [StoreFormat.EXPRESS, StoreFormat.STANDARD, StoreFormat.FLAGSHIP]
 URBANICITIES = [Urbanicity.URBAN_CORE, Urbanicity.URBAN, Urbanicity.SUBURBAN, Urbanicity.EXURBAN, Urbanicity.RURAL]
-FORMAT_WEIGHTS = [0.4, 0.45, 0.15]
+# Match production distribution: ~70 express, ~132 standard, ~47 flagship (out of ~238)
+FORMAT_WEIGHTS = [0.29, 0.55, 0.20]
 URBANICITY_WEIGHTS = [0.15, 0.30, 0.35, 0.12, 0.08]
 
 
@@ -48,21 +49,23 @@ def _jitter(center: float, spread: float = 0.15) -> float:
 
 def generate_locations() -> list[LocationOut]:
     locations: list[LocationOut] = []
-    idx = 0
+    idx = 1000
     for msa_name, lat, lng in MSAS:
-        count = random.randint(7, 14)
+        # ~16 stores per MSA to reach ~238 total
+        count = random.randint(13, 19)
         for i in range(count):
             idx += 1
             fmt = random.choices(FORMATS, weights=FORMAT_WEIGHTS, k=1)[0]
             urb = random.choices(URBANICITIES, weights=URBANICITY_WEIGHTS, k=1)[0]
 
-            base_sales = {"express": 45, "standard": 82, "flagship": 135}[fmt.value]
-            sales = base_sales + random.gauss(0, base_sales * 0.2)
-            sales = max(15, sales)
+            # Revenue scale matches production: Express ~800-1200K, Standard ~1400-2200K, Flagship ~2500-3400K
+            base_sales = {"express": 1000, "standard": 1800, "flagship": 2900}[fmt.value]
+            sales = base_sales + random.gauss(0, base_sales * 0.15)
+            sales = max(400, sales)
 
             locations.append(LocationOut(
-                id=f"ST{idx:03d}",
-                name=f"{msa_name} {fmt.value.title()} #{i+1}",
+                id=f"ST{idx:04d}",
+                name=f"Clover & Co #{idx}",
                 lat=_jitter(lat),
                 lng=_jitter(lng),
                 format=fmt,
@@ -77,7 +80,8 @@ def generate_competitors() -> list[CompetitorOut]:
     competitors: list[CompetitorOut] = []
     idx = 0
     for msa_name, lat, lng in MSAS:
-        count = random.randint(10, 18)
+        # ~27 per MSA to reach ~400 total
+        count = random.randint(22, 32)
         for _ in range(count):
             idx += 1
             brand = random.choice(COMPETITOR_BRANDS)
@@ -101,13 +105,14 @@ def generate_hotspots(locations: list[LocationOut]) -> list[HotspotOut]:
     hotspots: list[HotspotOut] = []
     idx = 0
     for msa_name, lat, lng in MSAS:
-        count = random.randint(1, 3)
+        # ~33 per MSA to reach ~497 total candidate locations
+        count = random.randint(28, 38)
         for _ in range(count):
             idx += 1
             fmt = random.choices(FORMATS, weights=FORMAT_WEIGHTS, k=1)[0]
             urb = random.choices(URBANICITIES, weights=URBANICITY_WEIGHTS, k=1)[0]
             score = round(random.uniform(60, 98), 1)
-            base_sales = {"express": 52, "standard": 95, "flagship": 155}[fmt.value]
+            base_sales = {"express": 1100, "standard": 2000, "flagship": 3200}[fmt.value]
             projected = base_sales + random.gauss(0, base_sales * 0.15)
 
             hotspots.append(HotspotOut(
@@ -115,7 +120,7 @@ def generate_hotspots(locations: list[LocationOut]) -> list[HotspotOut]:
                 lat=_jitter(lat, 0.18),
                 lng=_jitter(lng, 0.18),
                 score=score,
-                projected_sales=round(max(30, projected), 1),
+                projected_sales=round(max(500, projected), 1),
                 format=fmt,
                 urbanicity=urb,
             ))
@@ -170,16 +175,13 @@ def _metrics_for_reason(reason: str, loc: LocationOut) -> list[ClosureMetric]:
 
 def generate_closure_candidates(locations: list[LocationOut]) -> list[ClosureCandidateOut]:
     candidates: list[ClosureCandidateOut] = []
-    low_performers = sorted(locations, key=lambda l: l.monthly_sales)[:12]
+    low_performers = sorted(locations, key=lambda l: l.monthly_sales)[:5]
     reasons = [
         "Declining foot traffic (-23% YoY)",
         "New competitor within 0.5mi radius",
-        "Lease renewal at 2.3x current rate",
         "Below-threshold revenue for 6+ months",
-        "Population decline in trade area (-8%)",
-        "High cannibalization from nearby location",
     ]
-    for loc in low_performers[:10]:
+    for loc in low_performers[:3]:
         risk = round(random.uniform(55, 95), 1)
         reason = random.choice(reasons)
         candidates.append(ClosureCandidateOut(
@@ -228,19 +230,19 @@ def generate_data_sources() -> list[DataSourceOut]:
             name="Store Locations",
             type="Delta Table",
             icon="map-pin",
-            records="156",
+            records="238",
             last_sync="1 hr ago",
             refresh_rate="Daily",
             stats=[
-                DataSourceStat(key="Active Stores", value="148"),
+                DataSourceStat(key="Active Stores", value="238"),
                 DataSourceStat(key="Avg Store Age", value="8.3 yrs"),
                 DataSourceStat(key="Avg Sq. Footage", value="1,850"),
                 DataSourceStat(key="Regions Covered", value="15"),
             ],
             chart_data=[
-                ChartDataPoint(label="Express", value=62),
-                ChartDataPoint(label="Standard", value=68),
-                ChartDataPoint(label="Flagship", value=26),
+                ChartDataPoint(label="Express", value=70),
+                ChartDataPoint(label="Standard", value=132),
+                ChartDataPoint(label="Flagship", value=47),
             ],
             chart_type="bar",
         ),
@@ -348,19 +350,14 @@ def generate_data_sources() -> list[DataSourceOut]:
 
 def generate_kpis(locations: list[LocationOut]) -> list[KpiOut]:
     total = len(locations)
-    avg_rev = sum(l.monthly_sales for l in locations) / total
-    express_rev = sum(l.monthly_sales for l in locations if l.format == StoreFormat.EXPRESS) / max(1, sum(1 for l in locations if l.format == StoreFormat.EXPRESS))
-    standard_rev = sum(l.monthly_sales for l in locations if l.format == StoreFormat.STANDARD) / max(1, sum(1 for l in locations if l.format == StoreFormat.STANDARD))
-    flagship_rev = sum(l.monthly_sales for l in locations if l.format == StoreFormat.FLAGSHIP) / max(1, sum(1 for l in locations if l.format == StoreFormat.FLAGSHIP))
-    avg_age = sum(l.store_age_years for l in locations) / total
+    total_monthly = sum(l.monthly_sales for l in locations)
+    annual_rev = total_monthly * 12
+    competitors_count = 400  # matches generate_competitors output
 
     return [
-        KpiOut(label="Total Locations", value=str(total), trend=2.4, trend_label="+2.4% YoY", icon="store"),
-        KpiOut(label="Avg Revenue", value=f"${avg_rev:.0f}K/mo", trend=5.1, trend_label="+5.1% YoY", icon="dollar-sign"),
-        KpiOut(label="Express Revenue", value=f"${express_rev:.0f}K/mo", trend=3.2, trend_label="+3.2%", icon="trending-up"),
-        KpiOut(label="Standard Revenue", value=f"${standard_rev:.0f}K/mo", trend=4.8, trend_label="+4.8%", icon="trending-up"),
-        KpiOut(label="Flagship Revenue", value=f"${flagship_rev:.0f}K/mo", trend=7.3, trend_label="+7.3%", icon="trending-up"),
-        KpiOut(label="Avg Store Age", value=f"{avg_age:.1f} yrs", trend=-0.5, trend_label="-0.5 yrs", icon="calendar"),
+        KpiOut(label="Annual Revenue", value=f"${annual_rev / 1e6:.1f}B", trend=5.1, trend_label="+5.1% YoY", icon="dollar-sign"),
+        KpiOut(label="Active Locations", value=str(total), trend=2.4, trend_label="+2.4% YoY", icon="store"),
+        KpiOut(label="Competitors Tracked", value=str(competitors_count), trend=3.8, trend_label="+3.8% YoY", icon="building"),
     ]
 
 
@@ -368,7 +365,7 @@ def generate_model_performance() -> list[ModelPerformanceOut]:
     return [
         ModelPerformanceOut(
             format=StoreFormat.EXPRESS,
-            store_count=62,
+            store_count=70,
             r_squared=0.847,
             mae="$8.2K",
             rmse="$11.4K",
@@ -382,7 +379,7 @@ def generate_model_performance() -> list[ModelPerformanceOut]:
         ),
         ModelPerformanceOut(
             format=StoreFormat.STANDARD,
-            store_count=68,
+            store_count=132,
             r_squared=0.891,
             mae="$12.5K",
             rmse="$16.8K",
@@ -396,7 +393,7 @@ def generate_model_performance() -> list[ModelPerformanceOut]:
         ),
         ModelPerformanceOut(
             format=StoreFormat.FLAGSHIP,
-            store_count=26,
+            store_count=47,
             r_squared=0.912,
             mae="$18.7K",
             rmse="$24.1K",
@@ -463,10 +460,10 @@ def generate_alerts() -> list[AlertOut]:
 
 def generate_network_metrics() -> NetworkMetricsOut:
     return NetworkMetricsOut(
-        total_current_revenue="$12.4M",
-        projected_optimized_revenue="$14.8M",
-        revenue_uplift="+19.4%",
-        new_locations_recommended=12,
+        total_current_revenue="$4.4B",
+        projected_optimized_revenue="$6.2B",
+        revenue_uplift="+40.9%",
+        new_locations_recommended=497,
     )
 
 
