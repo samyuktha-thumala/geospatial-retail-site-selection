@@ -12,8 +12,8 @@ env:
   - name: APP_ENV
     value: "production"
   - name: DATABRICKS_WAREHOUSE_ID
-    value: "75fd8278393d07eb"
+    value: "YOUR_WAREHOUSE_ID"       # <- your SQL warehouse ID
   - name: DATABRICKS_CATALOG
-    value: "retail_consumer_goods"
+    value: "YOUR_CATALOG"            # <- your Unity Catalog name
   - name: DATABRICKS_SCHEMA
-    value: "geospatial_site_selection"
+    value: "YOUR_SCHEMA"             # <- schema where tables live

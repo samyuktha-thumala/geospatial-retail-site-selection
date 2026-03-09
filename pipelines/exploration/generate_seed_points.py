@@ -19,8 +19,8 @@
 # ---------------------------------------------------------------------------
 # Widget parameters
 # ---------------------------------------------------------------------------
-dbutils.widgets.text("catalog", "retail_consumer_goods", "Catalog")
-dbutils.widgets.text("schema", "geospatial_site_selection", "Schema")
+dbutils.widgets.text("catalog", "", "Catalog")
+dbutils.widgets.text("schema", "", "Schema")
 
 catalog = dbutils.widgets.get("catalog")
 schema = dbutils.widgets.get("schema")

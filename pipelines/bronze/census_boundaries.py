@@ -11,8 +11,8 @@
 # MAGIC - States (All US)
 # MAGIC
 # MAGIC **Output Tables:**
-# MAGIC - `{catalog}.{bronze_schema}.bronze_census_blockgroups` - Block group boundaries with native GEOGRAPHY type
-# MAGIC - `{catalog}.{bronze_schema}.bronze_census_states` - State boundaries with native GEOGRAPHY type
+# MAGIC - `{catalog}.{schema}.bronze_census_blockgroups` - Block group boundaries with native GEOGRAPHY type
+# MAGIC - `{catalog}.{schema}.bronze_census_states` - State boundaries with native GEOGRAPHY type
 # MAGIC
 # MAGIC **Optimizations:**
 # MAGIC - Uses native Databricks GEOGRAPHY type (SRID 4326)
@@ -38,19 +38,21 @@ import geopandas as gpd
 
 # Notebook parameters
 dbutils.widgets.text("catalog", "")
-dbutils.widgets.text("bronze_schema", "")
-dbutils.widgets.text("boundary_data_volume", "")
-dbutils.widgets.text("state_fips", "")
-dbutils.widgets.text("year", "")
+dbutils.widgets.text("schema", "")
+dbutils.widgets.text("state_fips", "36")
+dbutils.widgets.text("year", "2020")
 
 # Extract parameters
 catalog = dbutils.widgets.get("catalog")
-bronze_schema = dbutils.widgets.get("bronze_schema")
-boundary_data_volume = dbutils.widgets.get("boundary_data_volume")
+schema = dbutils.widgets.get("schema")
 state_fips = dbutils.widgets.get("state_fips")
 year = int(dbutils.widgets.get("year")) if dbutils.widgets.get("year") else 2020
 
-assert catalog and bronze_schema, "Missing required parameters"
+assert catalog and schema, "Missing required parameters: catalog, schema"
+
+# Auto-derive volume path
+boundary_data_volume = f"/Volumes/{catalog}/{schema}/boundary_data/"
+spark.sql(f"CREATE VOLUME IF NOT EXISTS {catalog}.{schema}.boundary_data")
 
 # COMMAND ----------
 
@@ -154,8 +156,8 @@ print(f"\nTotal block groups: {bg_df.count()}")
 # COMMAND ----------
 
 # Write to Unity Catalog
-bg_table = f"{catalog}.{bronze_schema}.bronze_census_blockgroups"
-states_table = f"{catalog}.{bronze_schema}.bronze_census_states"
+bg_table = f"{catalog}.{schema}.bronze_census_blockgroups"
+states_table = f"{catalog}.{schema}.bronze_census_states"
 
 (bg_df
  .repartition(10)

@@ -41,4 +41,5 @@ uv.lock
 # Local docs
 IMPLEMENTATION_PLAN.md
 REFACTORING_PLAN.md
+DETAILED_IMPLEMENTATION.md
 claude_errors.md

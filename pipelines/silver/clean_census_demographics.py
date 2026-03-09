@@ -16,7 +16,7 @@
 
 dbutils.widgets.text("catalog", "")
 dbutils.widgets.text("schema", "")
-dbutils.widgets.text("state_fips", "")
+dbutils.widgets.text("state_fips", "36")
 
 catalog = dbutils.widgets.get("catalog")
 schema = dbutils.widgets.get("schema")

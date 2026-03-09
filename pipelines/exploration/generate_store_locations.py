@@ -2,11 +2,9 @@
 # MAGIC %md
 # MAGIC # Generate Synthetic Store Locations
 # MAGIC
-# MAGIC This notebook generates approximately 1,500 synthetic retail store locations spread across 20 major US Metropolitan Statistical Areas (MSAs). Each store is assigned a format (express, standard, or flagship), urbanicity classification, and realistic attributes.
+# MAGIC Generates synthetic retail store locations across New York State metro areas. Each store is assigned a format (express, standard, or flagship), urbanicity classification, and realistic attributes.
 # MAGIC
-# MAGIC The output is written to the `bronze_store_locations` table in Unity Catalog for downstream site-selection analysis.
-# MAGIC
-# MAGIC **Target table:** `retail_consumer_goods.site_selection.bronze_store_locations`
+# MAGIC **Output:** `{catalog}.{schema}.bronze_store_locations`
 
 # COMMAND ----------
 
@@ -17,28 +15,23 @@ schema = dbutils.widgets.get("schema")
 
 # COMMAND ----------
 
-# MSA definitions: (name, state, center_lat, center_lng, store_count)
+# New York State metro areas: (name, state, center_lat, center_lng, store_count)
 MSA_DATA = [
-    ("New York",      "NY", 40.7128,  -74.0060,  180),
-    ("Los Angeles",   "CA", 34.0522, -118.2437,  150),
-    ("Chicago",       "IL", 41.8781,  -87.6298,  120),
-    ("Houston",       "TX", 29.7604,  -95.3698,   90),
-    ("Phoenix",       "AZ", 33.4484, -112.0740,   80),
-    ("Philadelphia",  "PA", 39.9526,  -75.1652,   75),
-    ("Dallas",        "TX", 32.7767,  -96.7970,   90),
-    ("Washington DC", "DC", 38.9072,  -77.0369,   75),
-    ("Atlanta",       "GA", 33.7490,  -84.3880,   75),
-    ("Miami",         "FL", 25.7617,  -80.1918,   70),
-    ("Seattle",       "WA", 47.6062, -122.3321,   60),
-    ("Boston",        "MA", 42.3601,  -71.0589,   60),
-    ("San Diego",     "CA", 32.7157, -117.1611,   60),
-    ("San Antonio",   "TX", 29.4241,  -98.4936,   60),
-    ("Denver",        "CO", 39.7392, -104.9903,   50),
-    ("Austin",        "TX", 30.2672,  -97.7431,   50),
-    ("Minneapolis",   "MN", 44.9778,  -93.2650,   40),
-    ("Portland",      "OR", 45.5152, -122.6784,   40),
-    ("Nashville",     "TN", 36.1627,  -86.7816,   40),
-    ("Charlotte",     "NC", 35.2271,  -80.8431,   35),
+    ("Manhattan",        "NY", 40.7831, -73.9712,  25),
+    ("Brooklyn",         "NY", 40.6782, -73.9442,  22),
+    ("Queens",           "NY", 40.7282, -73.7949,  20),
+    ("Bronx",            "NY", 40.8448, -73.8648,  18),
+    ("Staten Island",    "NY", 40.5795, -74.1502,  12),
+    ("Long Island",      "NY", 40.7891, -73.1350,  20),
+    ("Westchester",      "NY", 41.1220, -73.7949,  15),
+    ("Buffalo",          "NY", 42.8864, -78.8784,  18),
+    ("Rochester",        "NY", 43.1566, -77.6088,  16),
+    ("Syracuse",         "NY", 43.0481, -76.1474,  14),
+    ("Albany",           "NY", 42.6526, -73.7562,  14),
+    ("Yonkers",          "NY", 40.9312, -73.8988,  12),
+    ("White Plains",     "NY", 41.0340, -73.7629,  10),
+    ("Poughkeepsie",     "NY", 41.7004, -73.9210,   8),
+    ("Binghamton",       "NY", 42.0987, -75.9180,   6),
 ]
 
 # Format distribution: express=33%, standard=47%, flagship=20%

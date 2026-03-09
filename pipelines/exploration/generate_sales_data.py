@@ -8,8 +8,8 @@
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "retail_consumer_goods")
-dbutils.widgets.text("schema", "geospatial_site_selection")
+dbutils.widgets.text("catalog", "")
+dbutils.widgets.text("schema", "")
 catalog = dbutils.widgets.get("catalog")
 schema = dbutils.widgets.get("schema")
 

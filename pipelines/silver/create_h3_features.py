@@ -18,15 +18,12 @@
 from pyspark.sql import functions as F
 
 dbutils.widgets.text("catalog", "")
-dbutils.widgets.text("bronze_schema", "")
-dbutils.widgets.text("silver_schema", "")
+dbutils.widgets.text("schema", "")
 dbutils.widgets.text("state_fips", "36")
 
 catalog = dbutils.widgets.get("catalog")
-bronze_schema = dbutils.widgets.get("bronze_schema")
-silver_schema = dbutils.widgets.get("silver_schema")
+schema = dbutils.widgets.get("schema")
 state_fips = dbutils.widgets.get("state_fips")
-schema = silver_schema
 
 H3_RES = 8
 H3_AREA_SQKM = 0.7373  # constant for res-8
@@ -41,7 +38,7 @@ NULL_DISTANCE = 999.0  # miles
 
 h3_base_table = f"{catalog}.{schema}._tmp_h3_base"
 
-state_df = spark.table(f"{catalog}.{bronze_schema}.bronze_census_states").filter(F.col("state_fips") == state_fips)
+state_df = spark.table(f"{catalog}.{schema}.bronze_census_states").filter(F.col("state_fips") == state_fips)
 
 # Convert WKT to native geometry if needed, then polyfill
 state_cols = [c.lower() for c in state_df.columns]
@@ -139,7 +136,7 @@ spark.sql(f"""
             ELSE 0 END AS area_fraction,
         d.*
     FROM {h3_base_table} h
-    INNER JOIN {catalog}.{silver_schema}.silver_census_demographics d
+    INNER JOIN {catalog}.{schema}.silver_census_demographics d
         ON ST_Intersects(h.h3_geometry, d.geometry)
 """)
 
@@ -149,7 +146,7 @@ print(f"H3 × BG intersections: {bg_h3_count:,}")
 # COMMAND ----------
 
 # Dynamically discover available columns from the demographics table
-all_demo_cols = [r["col_name"] for r in spark.sql(f"DESCRIBE {catalog}.{silver_schema}.silver_census_demographics").collect()]
+all_demo_cols = [r["col_name"] for r in spark.sql(f"DESCRIBE {catalog}.{schema}.silver_census_demographics").collect()]
 
 desired_count_vars = [
     "total_population", "bachelors_degree", "masters_degree", "doctorate_degree",
@@ -202,7 +199,7 @@ comp_h3 = spark.sql(f"""
     SELECT
         h3_pointash3string(CONCAT('POINT(', lng, ' ', lat, ')'), {H3_RES}) AS h3_cell_id,
         brand
-    FROM {catalog}.{bronze_schema}.bronze_competitor_locations
+    FROM {catalog}.{schema}.bronze_competitor_locations
 """)
 
 comp_total = comp_h3.filter(F.col("brand").isNotNull()).groupBy("h3_cell_id").agg(
@@ -245,7 +242,7 @@ store_dist = spark.sql(f"""
             s.lat AS store_lat,
             s.lng AS store_lng,
             EXPLODE(h3_kring(h3_pointash3string(CONCAT('POINT(', s.lng, ' ', s.lat, ')'), {H3_RES}), {KRING_K})) AS h3_cell_id
-        FROM {catalog}.{bronze_schema}.bronze_store_locations s
+        FROM {catalog}.{schema}.bronze_store_locations s
     )
     SELECT
         sr.h3_cell_id,
@@ -263,7 +260,7 @@ comp_dist = spark.sql(f"""
             c.lat AS comp_lat,
             c.lng AS comp_lng,
             EXPLODE(h3_kring(h3_pointash3string(CONCAT('POINT(', c.lng, ' ', c.lat, ')'), {H3_RES}), {KRING_K})) AS h3_cell_id
-        FROM {catalog}.{bronze_schema}.bronze_competitor_locations c
+        FROM {catalog}.{schema}.bronze_competitor_locations c
     )
     SELECT
         cr.h3_cell_id,
