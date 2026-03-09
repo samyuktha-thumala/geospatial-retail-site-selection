@@ -10,11 +10,8 @@ resources:
             notebook_path: ../../silver/create_h3_features.py
             base_parameters:
               catalog: "${var.catalog}"
-              bronze_schema: "${var.schema}"
-              silver_schema: "${var.schema}"
-              gold_schema: "${var.schema}"
+              schema: "${var.schema}"
               state_fips: "${var.state_fips}"
-              config_path: "${workspace.file_path}/resources/configs/h3_features_config.yml"
 
           timeout_seconds: 7200
           max_retries: 2
@@ -40,10 +37,7 @@ resources:
             notebook_path: ../../silver/create_isochrones_valhalla.py
             base_parameters:
               catalog: "${var.catalog}"
-              bronze_schema: "${var.schema}"
-              silver_schema: "${var.schema}"
-              gold_schema: "${var.schema}"
-              config_path: "${workspace.file_path}/resources/configs/isochrone_config.yml"
+              schema: "${var.schema}"
               input_table: "${var.catalog}.${var.schema}.silver_seed_points"
               output_table_override: "seed_point_isochrones"
               skip_setup: "yes"

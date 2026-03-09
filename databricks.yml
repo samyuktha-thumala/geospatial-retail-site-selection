@@ -6,16 +6,16 @@ include:
 
 variables:
   warehouse_id:
-    default: "default-warehouse"
+    description: "SQL Warehouse ID for the Databricks App"
+    default: ""
 
 targets:
   dev:
     default: true
     mode: development
     workspace:
-      profile: e2-demo-west
+      profile: YOUR_PROFILE    # <- set to your Databricks CLI profile
   prod:
     mode: production
     workspace:
-      profile: e2-demo-west
-      root_path: /Workspace/Users/samyuktha.thumala@databricks.com/.bundle/${bundle.name}/${bundle.target}
+      profile: YOUR_PROFILE    # <- set to your Databricks CLI profile

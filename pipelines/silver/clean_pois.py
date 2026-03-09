@@ -23,23 +23,20 @@ from datetime import datetime
 
 # Notebook parameters
 dbutils.widgets.text("catalog", "")
-dbutils.widgets.text("bronze_schema", "")
-dbutils.widgets.text("silver_schema", "")
-dbutils.widgets.text("config_path", "")
-dbutils.widgets.text("input_table", "")
-dbutils.widgets.text("output_table", "")
-dbutils.widgets.text("state_filter", "")
+dbutils.widgets.text("schema", "")
+dbutils.widgets.text("state_filter", "NY")
 
 # Extract parameters
 catalog = dbutils.widgets.get("catalog")
-bronze_schema = dbutils.widgets.get("bronze_schema")
-silver_schema = dbutils.widgets.get("silver_schema")
-config_path = dbutils.widgets.get("config_path")
-input_table_widget = dbutils.widgets.get("input_table")
-output_table_widget = dbutils.widgets.get("output_table")
+schema = dbutils.widgets.get("schema")
 state_filter = dbutils.widgets.get("state_filter")
 
-assert catalog and bronze_schema and silver_schema and config_path, "Missing required parameters"
+# Auto-derive config path
+import os
+_nb_dir = os.path.dirname(dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get())
+config_path = os.path.join("/Workspace", _nb_dir.lstrip("/"), "..", "resources", "configs", "poi_config.yml")
+
+assert catalog and schema, "Missing required parameters: catalog, schema"
 
 # Load configuration
 with open(config_path, 'r') as f:
@@ -48,16 +45,9 @@ with open(config_path, 'r') as f:
 poi_cleaning_config = config['poi_cleaning']
 table_config = config['table_names']
 
-# Use explicit tables if provided, otherwise construct from config
-if input_table_widget and input_table_widget.strip():
-    input_table = input_table_widget.strip()
-else:
-    input_table = f"{catalog}.{bronze_schema}.bronze_{table_config['bronze_raw_suffix']}"
-
-if output_table_widget and output_table_widget.strip():
-    output_table = output_table_widget.strip()
-else:
-    output_table = f"{catalog}.{silver_schema}.silver_{table_config['silver_cleaned_suffix']}"
+# Construct table names from config
+input_table = f"{catalog}.{schema}.bronze_{table_config['bronze_raw_suffix']}"
+output_table = f"{catalog}.{schema}.silver_{table_config['silver_cleaned_suffix']}"
 
 # COMMAND ----------
 
@@ -163,7 +153,7 @@ if state_filter and state_filter.strip():
                ST_XMax(ST_GeomFromText(geometry_wkt, 4326)) as lng_max,
                ST_YMin(ST_GeomFromText(geometry_wkt, 4326)) as lat_min,
                ST_YMax(ST_GeomFromText(geometry_wkt, 4326)) as lat_max
-        FROM {catalog}.{bronze_schema}.bronze_census_states
+        FROM {catalog}.{schema}.bronze_census_states
         WHERE state_abbr = '{state_filter.strip().upper()}'
     """).collect()
     if state_bbox:

@@ -8,8 +8,8 @@
 # MAGIC **Format:** PBF (Protocolbuffer Binary Format)
 # MAGIC
 # MAGIC **Output:**
-# MAGIC - Volume: `/Volumes/{catalog}/{bronze_schema}/osm_data/{region}-latest.osm.pbf`
-# MAGIC - Table: `{catalog}.{bronze_schema}.bronze_osm_downloads` (tracking metadata)
+# MAGIC - Volume: `/Volumes/{catalog}/{schema}/osm_data/{region}-latest.osm.pbf`
+# MAGIC - Table: `{catalog}.{schema}.bronze_osm_downloads` (tracking metadata)
 # MAGIC
 
 # COMMAND ----------
@@ -23,19 +23,21 @@ import uuid
 
 # Notebook parameters
 dbutils.widgets.text("catalog", "")
-dbutils.widgets.text("bronze_schema", "")
-dbutils.widgets.text("osm_data_volume", "")
-dbutils.widgets.text("osm_url", "")
-dbutils.widgets.text("region", "")
+dbutils.widgets.text("schema", "")
+dbutils.widgets.text("osm_url", "https://download.geofabrik.de/north-america/us/new-york-latest.osm.pbf")
+dbutils.widgets.text("region", "new-york")
 
 # Extract parameters
 catalog = dbutils.widgets.get("catalog")
-bronze_schema = dbutils.widgets.get("bronze_schema")
-osm_data_volume = dbutils.widgets.get("osm_data_volume")
+schema = dbutils.widgets.get("schema")
 osm_url = dbutils.widgets.get("osm_url")
 region = dbutils.widgets.get("region")
 
-assert catalog and bronze_schema and osm_url, "Missing required parameters"
+assert catalog and schema and osm_url, "Missing required parameters: catalog, schema, osm_url"
+
+# Auto-derive volume path
+osm_data_volume = f"/Volumes/{catalog}/{schema}/osm_data/"
+spark.sql(f"CREATE VOLUME IF NOT EXISTS {catalog}.{schema}.osm_data")
 
 # COMMAND ----------
 
@@ -61,7 +63,7 @@ except:
 
 if not file_exists:
     # Create volume if needed
-    spark.sql(f"CREATE VOLUME IF NOT EXISTS {catalog}.{bronze_schema}.osm_data")
+    spark.sql(f"CREATE VOLUME IF NOT EXISTS {catalog}.{schema}.osm_data")
 
     # Download directly to volume path
     local_volume_path = volume_file_path.replace("dbfs:", "/dbfs")
@@ -84,7 +86,7 @@ if not file_exists:
 # COMMAND ----------
 
 # Write tracking metadata to Unity Catalog
-osm_table = f"{catalog}.{bronze_schema}.bronze_osm_downloads"
+osm_table = f"{catalog}.{schema}.bronze_osm_downloads"
 
 data = [(
     download_id,

@@ -11,8 +11,8 @@ logger = logging.getLogger(__name__)
 _cache: dict[str, tuple[float, Any]] = {}
 _CACHE_TTL = 600  # 10 minutes
 
-CATALOG = os.environ.get("DATABRICKS_CATALOG", "retail_consumer_goods")
-SCHEMA = os.environ.get("DATABRICKS_SCHEMA", "geospatial_site_selection")
+CATALOG = os.environ.get("DATABRICKS_CATALOG", "YOUR_CATALOG")
+SCHEMA = os.environ.get("DATABRICKS_SCHEMA", "YOUR_SCHEMA")
 
 
 def _is_databricks_app() -> bool:

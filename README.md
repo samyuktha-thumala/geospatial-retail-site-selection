@@ -55,45 +55,89 @@ cd geospatial-retail-site-selection
 
 ### 2. Configure Databricks
 
-Update `databricks.yml` with your workspace profile:
+There are two bundles and one app config to update. All use placeholder values (`YOUR_*`) — just replace them with your own.
+
+**`databricks.yml`** (app bundle) — set your CLI profile:
 
 ```yaml
 targets:
   dev:
-    default: true
-    mode: development
     workspace:
-      profile: YOUR_PROFILE
+      profile: YOUR_PROFILE       # ← databricks auth profiles
 ```
 
-Update `app/app.yaml` with your warehouse and catalog:
+**`pipelines/databricks.yml`** (pipeline bundle) — set your CLI profile, catalog, schema, and Census API key:
+
+```yaml
+targets:
+  dev:
+    workspace:
+      profile: YOUR_PROFILE       # ← databricks auth profiles
+    variables:
+      catalog: your_catalog       # ← Unity Catalog name
+      schema: your_schema         # ← schema to create tables in
+      census_api_key: "abc123"    # ← free at api.census.gov/data/key_signup.html
+      cluster_id: "xxxx-xxxxxx"   # ← cluster with GDAL/pyosmium (for 2 bronze tasks)
+```
+
+**`app/app.yaml`** — set your SQL Warehouse ID and catalog/schema:
 
 ```yaml
 env:
   - name: DATABRICKS_WAREHOUSE_ID
-    value: "your-warehouse-id"
+    value: "your-warehouse-id"    # ← from SQL Warehouses page
   - name: DATABRICKS_CATALOG
-    value: "your_catalog"
+    value: "your_catalog"         # ← same as above
   - name: DATABRICKS_SCHEMA
-    value: "your_schema"
+    value: "your_schema"          # ← same as above
 ```
 
-### 3. Run the data pipeline
+### 3. Run the data pipeline (optional)
 
-Upload the notebooks in `pipelines/` to your Databricks workspace and run them in order:
+> **Note:** The app works without running the pipeline — it falls back to synthetic data. Run the pipeline to populate your catalog with real data.
 
-1. **Bronze** — Ingest Census demographics, OSM POIs, store/competitor locations, seed points
-2. **Silver** — Clean POIs, compute H3 features, generate isochrones via Valhalla API
-3. **Gold** — Aggregate trade area features, generate sales, train XGBoost model, score expansion candidates
+Clone the repo as a **Git folder** in your Databricks workspace (Workspace → Git folders → Add Git folder). This preserves the directory structure so notebooks can find their config files automatically.
 
-Each notebook accepts `catalog` and `schema` as widget parameters. Set these to your Unity Catalog location.
+Every notebook takes just two widget parameters: **`catalog`** and **`schema`**. Set these to your Unity Catalog location. All other parameters (state FIPS, OSM URLs, config paths, volumes) have sensible defaults for New York State.
+
+**Additional requirement:** Bronze notebooks that call the Census API need a free API key. Get one at [api.census.gov/data/key_signup.html](https://api.census.gov/data/key_signup.html) and set it in the `census_api_key` widget.
+
+**Run these sequentially — each tier depends on the previous one:**
+
+**Bronze** (raw ingestion):
+1. `pipelines/bronze/census_demographics.py` — Census ACS demographics via API
+2. `pipelines/bronze/census_boundaries.py` — TIGER/Line block group boundaries
+3. `pipelines/bronze/osm_download.py` — OpenStreetMap road network from Geofabrik
+4. `pipelines/bronze/extract_pois.py` — Points of Interest from OSM
+
+**Exploration** (synthetic store/competitor data):
+1. `pipelines/exploration/generate_store_locations.py` — ~230 store locations across NY
+2. `pipelines/exploration/generate_competitor_locations.py` — ~400 competitor locations across NY
+3. `pipelines/exploration/generate_seed_points.py` — Expansion candidate seed points
+4. `pipelines/exploration/generate_sales_data.py` — Synthetic monthly sales
+
+**Silver** (cleaning & feature engineering):
+1. `pipelines/silver/clean_census_demographics.py` — Clean and derive rates
+2. `pipelines/silver/census_zcta.py` — ZCTA boundaries + demographics
+3. `pipelines/silver/clean_pois.py` — Filter and structure POIs
+4. `pipelines/silver/create_h3_features.py` — H3 hex features (demographics, POIs, competitors)
+5. `pipelines/silver/generate_seed_points.py` — Score and filter expansion candidates
+6. `pipelines/silver/create_isochrones_valhalla.py` — Drive-time trade area polygons
+
+**Gold** (ML & predict revenue):
+1. `pipelines/gold/aggregate_trade_area_features.py` — Aggregate features within store trade areas
+2. `pipelines/gold/generate_store_sales.py` — Revenue per sqft model
+3. `pipelines/gold/train_sales_model.py` — Train XGBoost, log to MLflow
+4. `pipelines/gold/aggregate_seed_trade_area_features.py` — Aggregate features for seed points
+5. `pipelines/gold/predict_seed_sales.py` — Score seed points with trained model
+6. `pipelines/gold/simulate_competitor_growth.py` — Project competitor expansion (2026–2028)
 
 ### 4. Build and deploy the app
 
 ```bash
 # Install frontend dependencies and build
 cd app/ui
-npm install
+npm install --legacy-peer-deps
 npm run build
 cd ../..
 
@@ -102,23 +146,22 @@ databricks bundle deploy --target dev
 
 # Restart the app to pick up new code
 databricks apps stop site-selection-dev --no-wait
-sleep 10
+sleep 15
 databricks apps start site-selection-dev --no-wait
 ```
 
 ### 5. Run locally (optional)
 
-The app works locally in synthetic mode (no Databricks connection needed):
+The app works locally in synthetic mode (no Databricks connection needed). Requires [uv](https://docs.astral.sh/uv/) for Python dependency management:
 
 ```bash
 # Backend
 cd app
-pip install -r requirements.txt
-uvicorn backend.main:app --reload --port 8000
+uv run uvicorn backend.main:app --reload --port 8000
 
 # Frontend (separate terminal)
 cd app/ui
-npm install
+npm install --legacy-peer-deps
 npm run dev
 ```
 
@@ -129,13 +172,18 @@ Set `DATABRICKS_PROFILE=YOUR_PROFILE` to connect to a live workspace instead.
 ## Project Structure
 
 ```
-├── databricks.yml                  # DABs bundle configuration
+├── databricks.yml                  # DABs bundle config (app deployment)
 ├── resources/
 │   └── site_selection_app.app.yml  # Databricks App resource
 ├── pipelines/
+│   ├── databricks.yml              # DABs bundle config (pipeline jobs)
+│   ├── resources/
+│   │   ├── configs/                # YAML configs (isochrone, H3, POI, census)
+│   │   └── jobs/                   # Job definitions (bronze, silver, gold)
 │   ├── bronze/                     # Raw data ingestion (Census, OSM, stores)
 │   ├── silver/                     # H3 features, isochrones, cleaned data
-│   └── gold/                       # ML model, scoring, competitor simulation
+│   ├── gold/                       # ML model, scoring, competitor simulation
+│   └── exploration/                # Synthetic data generators (stores, competitors)
 └── app/
     ├── app.yaml                    # App entrypoint config
     ├── backend/                    # FastAPI backend

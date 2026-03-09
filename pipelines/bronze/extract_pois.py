@@ -25,17 +25,20 @@ import os
 
 # Notebook parameters
 dbutils.widgets.text("catalog", "")
-dbutils.widgets.text("bronze_schema", "")
-dbutils.widgets.text("osm_region", "")
-dbutils.widgets.text("config_path", "")
+dbutils.widgets.text("schema", "")
+dbutils.widgets.text("osm_region", "new-york")
 
 # Extract parameters
 catalog = dbutils.widgets.get("catalog")
-bronze_schema = dbutils.widgets.get("bronze_schema")
+schema = dbutils.widgets.get("schema")
 osm_region = dbutils.widgets.get("osm_region")
-config_path = dbutils.widgets.get("config_path")
 
-assert catalog and bronze_schema and osm_region and config_path, "Missing required parameters"
+# Auto-derive config path
+import os
+_nb_dir = os.path.dirname(dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get())
+config_path = os.path.join("/Workspace", _nb_dir.lstrip("/"), "..", "resources", "configs", "poi_config.yml")
+
+assert catalog and schema and osm_region, "Missing required parameters: catalog, schema, osm_region"
 
 # Load configuration
 with open(config_path, 'r') as f:
@@ -46,8 +49,8 @@ table_config = config['table_names']
 paths_config = config['paths']
 
 # Define paths
-osm_file_path = f"/Volumes/{catalog}/{bronze_schema}/osm_data/{osm_region}-latest.osm.pbf"
-output_table = f"{catalog}.{bronze_schema}.bronze_{table_config['bronze_raw_suffix']}"
+osm_file_path = f"/Volumes/{catalog}/{schema}/osm_data/{osm_region}-latest.osm.pbf"
+output_table = f"{catalog}.{schema}.bronze_{table_config['bronze_raw_suffix']}"
 temp_path = paths_config['temp_path']
 
 # COMMAND ----------

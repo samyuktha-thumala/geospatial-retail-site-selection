@@ -34,10 +34,7 @@ from pyspark.sql.types import StructType, StructField, IntegerType, StringType, 
 # COMMAND ----------
 
 dbutils.widgets.text("catalog", "")
-dbutils.widgets.text("bronze_schema", "")
-dbutils.widgets.text("silver_schema", "")
-dbutils.widgets.text("gold_schema", "")
-dbutils.widgets.text("config_path", "")
+dbutils.widgets.text("schema", "")
 dbutils.widgets.text("skip_setup", "")
 dbutils.widgets.text("input_table", "")
 dbutils.widgets.text("output_table_override", "")
@@ -45,16 +42,18 @@ dbutils.widgets.text("valhalla_url", "https://valhalla1.openstreetmap.de/isochro
 dbutils.widgets.text("max_workers", "4")
 
 catalog = dbutils.widgets.get("catalog")
-bronze_schema = dbutils.widgets.get("bronze_schema")
-silver_schema = dbutils.widgets.get("silver_schema")
-gold_schema = dbutils.widgets.get("gold_schema")
-config_path = dbutils.widgets.get("config_path")
+schema = dbutils.widgets.get("schema")
 input_table_override = dbutils.widgets.get("input_table").strip()
 output_table_override = dbutils.widgets.get("output_table_override").strip()
 VALHALLA_URL = dbutils.widgets.get("valhalla_url")
 MAX_WORKERS = int(dbutils.widgets.get("max_workers"))
 
-assert catalog and bronze_schema and silver_schema, "Missing required parameters"
+# Auto-derive config path
+import os
+_nb_dir = os.path.dirname(dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get())
+config_path = os.path.join("/Workspace", _nb_dir.lstrip("/"), "..", "resources", "configs", "isochrone_config.yml")
+
+assert catalog and schema, "Missing required parameters: catalog, schema"
 
 # Load config for drive times if available
 DRIVE_TIMES = {"urban": 5, "suburban": 10, "rural": 15}
@@ -237,7 +236,7 @@ if input_table_override:
     """).collect()
 
     out_name = output_table_override if output_table_override else "silver_custom_isochrones"
-    out_table = f"{catalog}.{silver_schema}.{out_name}" if "." not in out_name else out_name
+    out_table = f"{catalog}.{schema}.{out_name}" if "." not in out_name else out_name
 
     print(f"Custom input: {input_table_override} ({len(locations)} locations)")
     results = compute_batch_parallel(locations, label=out_name, max_workers=MAX_WORKERS)
@@ -246,7 +245,7 @@ if input_table_override:
 else:
     # Default mode: process stores + competitors
     # Urbanicity is derived inline by joining to ZCTA (no separate update step needed)
-    zcta_table = f"{catalog}.{silver_schema}.silver_census_zcta"
+    zcta_table = f"{catalog}.{schema}.silver_census_zcta"
     stores = spark.sql(f"""
         SELECT s.store_number as location_id, s.lat, s.lng, s.format,
             CASE
@@ -254,7 +253,7 @@ else:
                 WHEN z.population_density_sqkm > 500 THEN 'suburban'
                 ELSE 'rural'
             END as urbanicity
-        FROM {catalog}.{bronze_schema}.bronze_store_locations s
+        FROM {catalog}.{schema}.bronze_store_locations s
         LEFT JOIN {zcta_table} z
             ON ST_Contains(z.geometry, ST_SetSRID(ST_Point(s.lng, s.lat), 4326))
     """).collect()
@@ -267,7 +266,7 @@ else:
                 WHEN z.population_density_sqkm > 500 THEN 'suburban'
                 ELSE 'rural'
             END as urbanicity
-        FROM {catalog}.{bronze_schema}.bronze_competitor_locations c
+        FROM {catalog}.{schema}.bronze_competitor_locations c
         LEFT JOIN {zcta_table} z
             ON ST_Contains(z.geometry, ST_SetSRID(ST_Point(c.lng, c.lat), 4326))
     """).collect()
@@ -276,10 +275,10 @@ else:
     store_results = compute_batch_parallel(stores, label="Stores", max_workers=MAX_WORKERS)
     comp_results = compute_batch_parallel(competitors, label="Competitors", max_workers=MAX_WORKERS)
 
-    store_table = f"{catalog}.{silver_schema}.silver_store_isochrones"
+    store_table = f"{catalog}.{schema}.silver_store_isochrones"
     write_isochrones(store_results, store_table)
 
-    comp_table = f"{catalog}.{silver_schema}.silver_competitor_isochrones"
+    comp_table = f"{catalog}.{schema}.silver_competitor_isochrones"
     write_isochrones(comp_results, comp_table)
 
 # COMMAND ----------
@@ -291,7 +290,7 @@ else:
 
 if input_table_override:
     out_name = output_table_override if output_table_override else "silver_custom_isochrones"
-    out_table = f"{catalog}.{silver_schema}.{out_name}" if "." not in out_name else out_name
+    out_table = f"{catalog}.{schema}.{out_name}" if "." not in out_name else out_name
     display(spark.sql(f"""
         SELECT urbanicity_category, COUNT(*) as cnt,
                ROUND(AVG(area_sqkm), 1) as avg_area_sqkm,

@@ -14,19 +14,16 @@ sync:
     - "resources/configs/*.yml"
 
 targets:
-  prod:
+  dev:
     default: true
-    mode: production
+    mode: development
     workspace:
-      host: https://e2-demo-west.cloud.databricks.com
-      root_path: /Workspace/Users/samyuktha.thumala@databricks.com/Store-Site-Selection
+      profile: YOUR_PROFILE    # ← set to your Databricks CLI profile
     variables:
-      catalog: retail_consumer_goods
-      schema: geospatial_site_selection
-      census_api_key: "7f801eabbdf7763d74330e776061901753eb2878"
-      state_fips: "36"
-      osm_url: "https://download.geofabrik.de/north-america/us/new-york-latest.osm.pbf"
-      osm_region: "new-york"
+      catalog: your_catalog    # ← your Unity Catalog name
+      schema: your_schema      # ← schema to create tables in
+      census_api_key: ""       # ← get free at api.census.gov/data/key_signup.html
+      cluster_id: ""           # ← cluster with GDAL/GEOS/pyosmium (for census_boundaries + extract_pois)
 
 variables:
   # Unity Catalog
@@ -47,21 +44,21 @@ variables:
 
   state_fips:
     description: "Comma-separated state FIPS codes, or 'all' for nationwide"
-    default: "all"
+    default: "36"
 
   # OSM Configuration
   osm_url:
     description: "Geofabrik OSM download URL"
-    default: "https://download.geofabrik.de/north-america/us-latest.osm.pbf"
+    default: "https://download.geofabrik.de/north-america/us/new-york-latest.osm.pbf"
 
   osm_region:
     description: "OSM region name"
-    default: "us"
+    default: "new-york"
 
-  # Cluster Configuration
-  node_type:
-    description: "Databricks node type"
-    default: "m5d.xlarge"
+  # Cluster Configuration (needed for tasks with native C/C++ dependencies like GDAL, pyosmium)
+  cluster_id:
+    description: "Existing cluster ID with GDAL/GEOS/pyosmium pre-installed (needed for census_boundaries and extract_pois)"
+    default: ""
 
   # Isochrone Configuration
   drive_time_buckets:
@@ -86,10 +83,10 @@ variables:
 
   # POI Configuration
   state_filter:
-    description: "State filter for POI extraction (e.g., MA for Massachusetts). Leave empty to process entire country."
-    default: ""
+    description: "State abbreviation for POI extraction (e.g., NY for New York)"
+    default: "NY"
 
   # Notifications
   user_email:
     description: "Email address for job notifications"
-    default: "samyuktha.thumala@databricks.com"
+    default: ""

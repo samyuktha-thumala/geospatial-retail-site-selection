@@ -2,11 +2,11 @@
 # MAGIC %md
 # MAGIC # Generate Competitor Locations
 # MAGIC
-# MAGIC This notebook generates approximately **5,000 anonymized competitor locations** across 20 major US MSAs.
+# MAGIC Generates anonymized competitor locations across New York State metro areas.
+# MAGIC Five synthetic competitor brands are distributed proportionally, each with
+# MAGIC distinct geographic clustering patterns and coverage strategies.
 # MAGIC
-# MAGIC Five synthetic competitor brands are distributed proportionally across metropolitan areas, each with
-# MAGIC distinct geographic clustering patterns and coverage strategies. The output is written to the
-# MAGIC `bronze_competitor_locations` table for downstream analysis.
+# MAGIC **Output:** `{catalog}.{schema}.bronze_competitor_locations`
 
 # COMMAND ----------
 
@@ -20,29 +20,24 @@ schema = dbutils.widgets.get("schema")
 
 # DBTITLE 1,Define competitor brands and MSA data
 # ---------------------------------------------------------------------------
-# MSA centers (same 20 MSAs used for store-location generation)
+# New York State metro areas (matches store-location generation)
 # ---------------------------------------------------------------------------
 msa_centers = {
-    "New York":       {"lat": 40.7128, "lng": -74.0060, "state": "NY", "weight": 1.00},
-    "Los Angeles":    {"lat": 34.0522, "lng": -118.2437, "state": "CA", "weight": 0.85},
-    "Chicago":        {"lat": 41.8781, "lng": -87.6298, "state": "IL", "weight": 0.70},
-    "Dallas":         {"lat": 32.7767, "lng": -96.7970, "state": "TX", "weight": 0.60},
-    "Houston":        {"lat": 29.7604, "lng": -95.3698, "state": "TX", "weight": 0.58},
-    "Washington":     {"lat": 38.9072, "lng": -77.0369, "state": "DC", "weight": 0.55},
-    "Philadelphia":   {"lat": 39.9526, "lng": -75.1652, "state": "PA", "weight": 0.50},
-    "Miami":          {"lat": 25.7617, "lng": -80.1918, "state": "FL", "weight": 0.48},
-    "Atlanta":        {"lat": 33.7490, "lng": -84.3880, "state": "GA", "weight": 0.46},
-    "Boston":         {"lat": 42.3601, "lng": -71.0589, "state": "MA", "weight": 0.44},
-    "Phoenix":        {"lat": 33.4484, "lng": -112.0740, "state": "AZ", "weight": 0.42},
-    "San Francisco":  {"lat": 37.7749, "lng": -122.4194, "state": "CA", "weight": 0.40},
-    "Riverside":      {"lat": 33.9533, "lng": -117.3962, "state": "CA", "weight": 0.38},
-    "Detroit":        {"lat": 42.3314, "lng": -83.0458, "state": "MI", "weight": 0.36},
-    "Seattle":        {"lat": 47.6062, "lng": -122.3321, "state": "WA", "weight": 0.34},
-    "Minneapolis":    {"lat": 44.9778, "lng": -93.2650, "state": "MN", "weight": 0.32},
-    "San Diego":      {"lat": 32.7157, "lng": -117.1611, "state": "CA", "weight": 0.30},
-    "Tampa":          {"lat": 27.9506, "lng": -82.4572, "state": "FL", "weight": 0.28},
-    "Denver":         {"lat": 39.7392, "lng": -104.9903, "state": "CO", "weight": 0.26},
-    "St. Louis":      {"lat": 38.6270, "lng": -90.1994, "state": "MO", "weight": 0.24},
+    "Manhattan":      {"lat": 40.7831, "lng": -73.9712, "state": "NY", "weight": 1.00},
+    "Brooklyn":       {"lat": 40.6782, "lng": -73.9442, "state": "NY", "weight": 0.90},
+    "Queens":         {"lat": 40.7282, "lng": -73.7949, "state": "NY", "weight": 0.80},
+    "Bronx":          {"lat": 40.8448, "lng": -73.8648, "state": "NY", "weight": 0.70},
+    "Staten Island":  {"lat": 40.5795, "lng": -74.1502, "state": "NY", "weight": 0.50},
+    "Long Island":    {"lat": 40.7891, "lng": -73.1350, "state": "NY", "weight": 0.80},
+    "Westchester":    {"lat": 41.1220, "lng": -73.7949, "state": "NY", "weight": 0.60},
+    "Buffalo":        {"lat": 42.8864, "lng": -78.8784, "state": "NY", "weight": 0.70},
+    "Rochester":      {"lat": 43.1566, "lng": -77.6088, "state": "NY", "weight": 0.60},
+    "Syracuse":       {"lat": 43.0481, "lng": -76.1474, "state": "NY", "weight": 0.55},
+    "Albany":         {"lat": 42.6526, "lng": -73.7562, "state": "NY", "weight": 0.55},
+    "Yonkers":        {"lat": 40.9312, "lng": -73.8988, "state": "NY", "weight": 0.50},
+    "White Plains":   {"lat": 41.0340, "lng": -73.7629, "state": "NY", "weight": 0.40},
+    "Poughkeepsie":   {"lat": 41.7004, "lng": -73.9210, "state": "NY", "weight": 0.30},
+    "Binghamton":     {"lat": 42.0987, "lng": -75.9180, "state": "NY", "weight": 0.25},
 }
 
 msa_names = list(msa_centers.keys())
@@ -52,42 +47,42 @@ msa_names = list(msa_centers.keys())
 # ---------------------------------------------------------------------------
 brands = {
     "Competitor A": {
-        "total": 1500,
+        "total": 120,
         "sigma": 0.15,
         "description": "Broad coverage, similar to standard stores",
-        "msas": msa_names,                  # all 20 MSAs
+        "msas": msa_names,
         "store_types": ["Standard", "Superstore", "Express"],
         "type_weights": [0.50, 0.30, 0.20],
     },
     "Competitor B": {
-        "total": 1200,
+        "total": 100,
         "sigma": 0.08,
         "description": "Urban-focused, tighter clustering",
-        "msas": msa_names,                  # all 20 MSAs
+        "msas": msa_names,
         "store_types": ["Urban", "Metro", "Downtown"],
         "type_weights": [0.45, 0.35, 0.20],
     },
     "Competitor C": {
-        "total": 900,
+        "total": 70,
         "sigma": 0.12,
-        "description": "Regional clusters, concentrated in 10 MSAs",
-        "msas": msa_names[:10],             # first 10 MSAs only
+        "description": "Regional clusters, concentrated in top metros",
+        "msas": msa_names[:10],
         "store_types": ["Regional", "Flagship", "Outlet"],
         "type_weights": [0.55, 0.25, 0.20],
     },
     "Competitor D": {
-        "total": 800,
+        "total": 65,
         "sigma": 0.25,
         "description": "Suburban focus",
-        "msas": msa_names,                  # all 20 MSAs
+        "msas": msa_names,
         "store_types": ["Suburban", "Strip Mall", "Big Box"],
         "type_weights": [0.40, 0.35, 0.25],
     },
     "Competitor E": {
-        "total": 600,
+        "total": 45,
         "sigma": 0.10,
-        "description": "Niche markets, 8 MSAs only",
-        "msas": msa_names[:8],              # first 8 MSAs only
+        "description": "Niche markets, NYC metro only",
+        "msas": msa_names[:8],
         "store_types": ["Boutique", "Specialty", "Pop-up"],
         "type_weights": [0.50, 0.30, 0.20],
     },

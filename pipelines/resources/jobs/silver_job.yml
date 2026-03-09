@@ -36,10 +36,8 @@ resources:
             notebook_path: ../../silver/clean_pois.py
             base_parameters:
               catalog: "${var.catalog}"
-              bronze_schema: "${var.schema}"
-              silver_schema: "${var.schema}"
+              schema: "${var.schema}"
               state_filter: "${var.state_filter}"
-              config_path: "${workspace.file_path}/resources/configs/poi_config.yml"
 
           timeout_seconds: 3600
           max_retries: 2
@@ -52,10 +50,7 @@ resources:
             notebook_path: ../../silver/create_isochrones_valhalla.py
             base_parameters:
               catalog: "${var.catalog}"
-              bronze_schema: "${var.schema}"
-              silver_schema: "${var.schema}"
-              gold_schema: "${var.schema}"
-              config_path: "${workspace.file_path}/resources/configs/isochrone_config.yml"
+              schema: "${var.schema}"
               skip_setup: "yes"
 
           timeout_seconds: 7200

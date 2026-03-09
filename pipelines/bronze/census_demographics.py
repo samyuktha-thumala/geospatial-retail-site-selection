@@ -24,26 +24,31 @@ from pyspark.sql.types import *
 from datetime import datetime
 import uuid
 
-# Widget parameters (injected by DABs job)
+# Widget parameters
 dbutils.widgets.text("catalog", "")
-dbutils.widgets.text("bronze_schema", "")
+dbutils.widgets.text("schema", "")
 dbutils.widgets.text("census_api_key", "")
-dbutils.widgets.text("census_data_volume", "")
-dbutils.widgets.text("config_path", "")
-dbutils.widgets.text("acs_year", "")
-dbutils.widgets.text("state_fips", "")
+dbutils.widgets.text("acs_year", "2023")
+dbutils.widgets.text("state_fips", "36")
 
 # Extract parameters
 catalog = dbutils.widgets.get("catalog")
-bronze_schema = dbutils.widgets.get("bronze_schema")
+schema = dbutils.widgets.get("schema")
 census_api_key = dbutils.widgets.get("census_api_key")
-census_data_volume = dbutils.widgets.get("census_data_volume")
-config_path = dbutils.widgets.get("config_path")
 acs_year = dbutils.widgets.get("acs_year")
 state_fips = dbutils.widgets.get("state_fips")
 
+# Auto-derive paths
+import os
+_nb_dir = os.path.dirname(dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get())
+config_path = os.path.join("/Workspace", _nb_dir.lstrip("/"), "..", "resources", "configs", "census_variables.yml")
+census_data_volume = f"/Volumes/{catalog}/{schema}/census_data/"
+
 # Validate required parameters
-assert catalog and bronze_schema and census_api_key and config_path, "Missing required parameters"
+assert catalog and schema and census_api_key, "Missing required parameters: catalog, schema, census_api_key"
+
+# Create volume if it doesn't exist
+spark.sql(f"CREATE VOLUME IF NOT EXISTS {catalog}.{schema}.census_data")
 
 # COMMAND ----------
 
@@ -196,7 +201,7 @@ print(f"Total demographic records: {census_df.count()}")
 # COMMAND ----------
 
 # Write to Unity Catalog
-census_table = f"{catalog}.{bronze_schema}.bronze_census_demographics"
+census_table = f"{catalog}.{schema}.bronze_census_demographics"
 
 (census_df
  .write
