@@ -10,6 +10,7 @@ node_modules/
 .tanstack/
 *.tsbuildinfo
 dist/
+!app/ui/dist/
 bun.lock
 package-lock.json
 uv.lock
