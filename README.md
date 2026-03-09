@@ -92,39 +92,38 @@ env:
     value: "your_schema"          # ← same as above
 ```
 
-### 3. Run the data pipeline (optional)
+### 3. Run the data pipeline
 
-> **Note:** The app works without running the pipeline — it falls back to synthetic data. Run the pipeline to populate your catalog with real data.
+> **Note:** The app works without running the pipeline — it falls back to synthetic data. Run the pipeline only if you want real data in your catalog.
 
-Clone the repo as a **Git folder** in your Databricks workspace (Workspace → Git folders → Add Git folder). This preserves the directory structure so notebooks can find their config files automatically.
+**Prerequisites:**
+- Create a catalog and schema in Unity Catalog: `CREATE CATALOG my_catalog; USE CATALOG my_catalog; CREATE SCHEMA my_schema;`
+- Get a free Census API key at [api.census.gov/data/key_signup.html](https://api.census.gov/data/key_signup.html)
 
-Every notebook takes just two widget parameters: **`catalog`** and **`schema`**. Set these to your Unity Catalog location. All other parameters (state FIPS, OSM URLs, config paths, volumes) have sensible defaults for New York State.
+Clone the repo as a **Git folder** in your Databricks workspace (Workspace → Git folders → Add Git folder). Every notebook takes `catalog` and `schema` as widget parameters. All other parameters default to New York State.
 
-**Additional requirement:** Bronze notebooks that call the Census API need a free API key. Get one at [api.census.gov/data/key_signup.html](https://api.census.gov/data/key_signup.html) and set it in the `census_api_key` widget.
+**Run in this order:**
 
-**Run these sequentially — each tier depends on the previous one:**
+**Step 1 — Exploration** (synthetic store/competitor data — run these first):
+1. `pipelines/exploration/generate_store_locations.py` — ~238 store locations across NY
+2. `pipelines/exploration/generate_competitor_locations.py` — ~400 competitor locations
+3. `pipelines/exploration/generate_seed_points.py` — Expansion candidate seed points
 
-**Bronze** (raw ingestion):
-1. `pipelines/bronze/census_demographics.py` — Census ACS demographics via API
+**Step 2 — Bronze** (raw ingestion from external APIs):
+1. `pipelines/bronze/census_demographics.py` — Census ACS demographics (needs `census_api_key`)
 2. `pipelines/bronze/census_boundaries.py` — TIGER/Line block group boundaries
-3. `pipelines/bronze/osm_download.py` — OpenStreetMap road network from Geofabrik
+3. `pipelines/bronze/osm_download.py` — OpenStreetMap data from Geofabrik
 4. `pipelines/bronze/extract_pois.py` — Points of Interest from OSM
 
-**Exploration** (synthetic store/competitor data):
-1. `pipelines/exploration/generate_store_locations.py` — ~230 store locations across NY
-2. `pipelines/exploration/generate_competitor_locations.py` — ~400 competitor locations across NY
-3. `pipelines/exploration/generate_seed_points.py` — Expansion candidate seed points
-4. `pipelines/exploration/generate_sales_data.py` — Synthetic monthly sales
-
-**Silver** (cleaning & feature engineering):
+**Step 3 — Silver** (cleaning & feature engineering):
 1. `pipelines/silver/clean_census_demographics.py` — Clean and derive rates
-2. `pipelines/silver/census_zcta.py` — ZCTA boundaries + demographics
+2. `pipelines/silver/census_zcta.py` — ZCTA boundaries + demographics (needs `census_api_key`)
 3. `pipelines/silver/clean_pois.py` — Filter and structure POIs
 4. `pipelines/silver/create_h3_features.py` — H3 hex features (demographics, POIs, competitors)
 5. `pipelines/silver/generate_seed_points.py` — Score and filter expansion candidates
-6. `pipelines/silver/create_isochrones_valhalla.py` — Drive-time trade area polygons
+6. `pipelines/silver/create_isochrones_valhalla.py` — Drive-time trade area polygons (calls Valhalla public API)
 
-**Gold** (ML & predict revenue):
+**Step 4 — Gold** (ML & scoring):
 1. `pipelines/gold/aggregate_trade_area_features.py` — Aggregate features within store trade areas
 2. `pipelines/gold/generate_store_sales.py` — Revenue per sqft model
 3. `pipelines/gold/train_sales_model.py` — Train XGBoost, log to MLflow
