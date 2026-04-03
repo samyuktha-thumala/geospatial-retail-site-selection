@@ -6,7 +6,8 @@ from databricks.sdk import WorkspaceClient
 
 logger = logging.getLogger(__name__)
 
-ENDPOINT_NAME = "databricks-gemini-2-5-flash"
+import os
+ENDPOINT_NAME = os.environ.get("SERVING_ENDPOINT", "YOUR_SERVING_ENDPOINT")
 
 # Maximum number of tool-call round trips before forcing a text reply
 MAX_TOOL_ROUNDS = 3
