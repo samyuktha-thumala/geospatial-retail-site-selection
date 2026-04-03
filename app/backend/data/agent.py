@@ -8,7 +8,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-ENDPOINT_NAME = "databricks-claude-sonnet-4-6"
+ENDPOINT_NAME = os.environ.get("SERVING_ENDPOINT", "YOUR_SERVING_ENDPOINT")
 MAX_TOOL_ROUNDS = 5
 
 # --- Area resolution: CBSA (primary) → bounding box (fallback for boroughs/neighborhoods) ---
