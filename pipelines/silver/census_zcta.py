@@ -100,26 +100,16 @@ print(f"Total ZCTAs in bounding box: {len(all_features)}")
 
 # COMMAND ----------
 
-# Convert GeoJSON features to Spark DataFrame
-zcta_rows = []
-for feat in all_features:
-    props = feat["properties"]
-    geom = feat["geometry"]
-    zcta_rows.append({
-        "zcta": str(props["GEOID"]),
-        "area_land_sqm": int(props.get("AREALAND", 0)),
-        "area_water_sqm": int(props.get("AREAWATER", 0)),
-        "geometry_geojson": json.dumps(geom),
-    })
-
-zcta_schema = StructType([
-    StructField("zcta", StringType()),
-    StructField("area_land_sqm", LongType()),
-    StructField("area_water_sqm", LongType()),
-    StructField("geometry_geojson", StringType()),
-])
-
-zcta_df = spark.createDataFrame(zcta_rows, schema=zcta_schema)
+# Convert GeoJSON features to Spark DataFrame — distributed, no Python loop
+zcta_df = (
+    spark.read.json(sc.parallelize([json.dumps(f) for f in all_features]))
+    .select(
+        F.col("properties.GEOID").cast("string").alias("zcta"),
+        F.coalesce(F.col("properties.AREALAND").cast("long"), F.lit(0)).alias("area_land_sqm"),
+        F.coalesce(F.col("properties.AREAWATER").cast("long"), F.lit(0)).alias("area_water_sqm"),
+        F.to_json(F.col("geometry")).alias("geometry_geojson"),
+    )
+)
 
 # Convert GeoJSON to geometry and compute area
 zcta_df = zcta_df.withColumn(
@@ -194,11 +184,14 @@ for code, name in zcta_variables.items():
 # Cast numeric columns — Census returns -666666666 for missing values
 float_vars = {"median_age"}
 geo_cols = {"NAME", "zcta"}
-for col_name in acs_df.columns:
-    if col_name not in geo_cols:
-        cast_type = "double" if col_name in float_vars else "long"
-        acs_df = acs_df.withColumn(col_name, F.col(col_name).cast(cast_type))
-        acs_df = acs_df.withColumn(col_name, F.when(F.col(col_name) < 0, None).otherwise(F.col(col_name)))
+cast_exprs = [
+    F.when(F.col(c).cast("double" if c in float_vars else "long") < 0, None)
+     .otherwise(F.col(c).cast("double" if c in float_vars else "long"))
+     .alias(c)
+    if c not in geo_cols else F.col(c)
+    for c in acs_df.columns
+]
+acs_df = acs_df.select(*cast_exprs)
 
 # Filter to state ZCTAs using a join (avoids .collect())
 acs_filtered = acs_df.join(state_zctas.select("zcta"), "zcta", "inner")

@@ -10,7 +10,8 @@ from .models import (
     DemographicsOut, DemandParams, SimulationResultOut, OptimizedLocation,
     ChatMessageIn, ChatResponseOut, AlertOut, NetworkMetricsOut,
     ClosestCompetitorOut, IsochroneOut, H3FeatureCollection, StoreFormat,
-    # ValidationLayerInfo, ValidationGeoJSON, ValidationFeature,  # commented out — see validation section below
+    SaveScenarioIn, SaveScenarioOut,
+    AgentChatIn, AgentChatOut,
 )
 from .data.store import db
 
@@ -179,23 +180,74 @@ async def run_simulation(params: DemandParams):
     )
 
 
-@api.post("/chat", response_model=ChatResponseOut, operation_id="sendChatMessage")
-async def send_chat_message(msg: ChatMessageIn):
-    from .data.gemini_chat import chat_with_gemini, build_summaries_from_store
+@api.post("/save-scenario", response_model=SaveScenarioOut, operation_id="saveScenario")
+async def save_scenario(body: SaveScenarioIn):
+    """Append a scenario result to gold_expansion_results."""
+    from .data import sql_client as sql
 
-    # Build data context summaries
-    summaries = build_summaries_from_store(db)
+    locations_json = json.dumps([loc.model_dump() for loc in body.optimized_locations])
 
-    # Convert history to list of dicts
-    history = [{"role": h.role, "content": h.content} for h in msg.history]
+    insert_sql = f"""
+    INSERT INTO {sql.table('gold_expansion_results')}
+    (scenario_id, scenario_date, scenario_summary, competitor_year,
+     min_distance_from_network_urban, min_distance_from_network_suburban, min_distance_from_network_rural,
+     min_distance_between_new_urban, min_distance_between_new_suburban, min_distance_between_new_rural,
+     final_locations_count, excluded_at_risk_count, removed_store_count, added_location_count,
+     total_projected_revenue, network_revenue_change, cannibalization_rate, avg_site_score,
+     optimized_locations)
+    VALUES
+    ('{body.scenario_id}', current_timestamp(), '{body.scenario_summary.replace("'", "''")}', {body.competitor_year},
+     {body.min_distance_from_network_urban}, {body.min_distance_from_network_suburban}, {body.min_distance_from_network_rural},
+     {body.min_distance_between_new_urban}, {body.min_distance_between_new_suburban}, {body.min_distance_between_new_rural},
+     {body.final_locations_count}, {body.excluded_at_risk_count}, {body.removed_store_count}, {body.added_location_count},
+     {body.total_projected_revenue}, {body.network_revenue_change}, {body.cannibalization_rate}, {body.avg_site_score},
+     '{locations_json.replace("'", "''")}')
+    """
 
-    result = chat_with_gemini(
-        message=msg.message,
-        conversation_history=history,
-        summaries=summaries,
+    try:
+        sql.execute_sql(insert_sql)
+        return SaveScenarioOut(success=True, scenario_id=body.scenario_id, message="Scenario saved successfully")
+    except Exception as e:
+        logger.error(f"Failed to save scenario: {e}")
+        return SaveScenarioOut(success=False, scenario_id=body.scenario_id, message=f"Failed to save: {str(e)[:200]}")
+
+
+@api.post("/agent/chat", response_model=AgentChatOut, operation_id="agentChat")
+async def agent_chat(body: AgentChatIn):
+    """Site Agent — Claude Sonnet 4.6 with tool-calling."""
+    from .data.agent import run_agent
+
+    history = [{"role": h.role, "content": h.content} for h in body.history]
+    result = run_agent(
+        message=body.message,
+        history=history,
+        page_context=body.page_context,
+    )
+    return AgentChatOut(
+        response=result["response"],
+        map_points=[
+            {"lat": p["lat"], "lng": p["lng"], "label": p.get("label", ""), "properties": p.get("properties", {})}
+            for p in result.get("map_points", [])
+        ],
+        suggestions=result.get("suggestions", []),
     )
 
-    return ChatResponseOut(response=result["response"], suggestions=result["suggestions"])
+
+@api.post("/chat", response_model=ChatResponseOut, operation_id="sendChatMessage")
+async def send_chat_message(msg: ChatMessageIn):
+    from .data.genie_chat import chat_with_genie
+
+    result = chat_with_genie(
+        message=msg.message,
+        conversation_id=msg.conversation_id,
+    )
+
+    return ChatResponseOut(
+        response=result["response"],
+        suggestions=result["suggestions"],
+        conversation_id=result.get("conversation_id"),
+        map_points=result.get("map_points", []),
+    )
 
 
 @api.get("/h3-features/{store_id}", response_model=H3FeatureCollection, operation_id="getH3Features")

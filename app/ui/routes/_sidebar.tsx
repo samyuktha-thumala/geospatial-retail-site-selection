@@ -1,6 +1,5 @@
 import { createFileRoute, Outlet, Link, useMatchRoute } from "@tanstack/react-router";
-import { Database, Map, Brain, Globe, FlaskConical } from "lucide-react";
-import { ChatBot } from "@/components/shared/chatbot";
+import { Database, Map, Brain, Globe, FlaskConical, HelpCircle, Presentation } from "lucide-react";
 
 const navItems = [
   { to: "/network-diagnostics" as const, label: "Network Diagnostics", icon: Map },
@@ -49,6 +48,23 @@ function TopNavLayout() {
             );
           })}
         </nav>
+
+        {/* Right side actions */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent("start-tour"))}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 rounded-md hover:bg-slate-800 hover:text-white transition-colors"
+          >
+            <HelpCircle size={14} />
+            Tour
+          </button>
+          <button
+            onClick={() => window.open("/slides", "_blank", "noopener")}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 rounded-md hover:bg-slate-800 hover:text-white transition-colors"
+          >
+            <Presentation size={14} />
+          </button>
+        </div>
       </header>
 
       {/* Main Content */}
@@ -56,8 +72,7 @@ function TopNavLayout() {
         <Outlet />
       </main>
 
-      {/* Floating ChatBot - highest z-index */}
-      <ChatBot />
+      {/* Agent chat is now inline in each page's panel */}
     </div>
   );
 }

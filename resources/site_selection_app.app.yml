@@ -4,3 +4,30 @@ resources:
       name: site-selection-${bundle.target}
       description: "Retail Site Selection Platform for Strategic Expansion"
       source_code_path: ../app
+      config:
+        env:
+          - name: APP_ENV
+            value: ${bundle.target}
+          - name: DATABRICKS_WAREHOUSE_ID
+            value: ${var.warehouse_id}
+          - name: DATABRICKS_CATALOG
+            value: ${var.catalog}
+          - name: DATABRICKS_SCHEMA
+            value: ${var.schema}
+          - name: GENIE_SPACE_ID
+            value: ${var.genie_space_id}
+      resources:
+        - name: genie-space
+          genie_space:
+            name: "Site Selection Assistant"
+            space_id: ${var.genie_space_id}
+            permission: CAN_RUN
+        - name: sql-warehouse
+          sql_warehouse:
+            name: "SQL Warehouse"
+            id: ${var.warehouse_id}
+            permission: CAN_USE
+        - name: serving-endpoint
+          serving_endpoint:
+            name: "YOUR_SERVING_ENDPOINT"  # <- your Foundation Model API serving endpoint
+            permission: CAN_QUERY

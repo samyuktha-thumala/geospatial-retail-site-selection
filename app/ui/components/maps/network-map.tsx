@@ -1,6 +1,6 @@
 import { useEffect, useRef, useMemo } from "react";
 import L from "leaflet";
-import type { Location, Competitor, ClosureCandidate, Isochrone, H3FeatureCollection } from "@/lib/api";
+import type { Location, Competitor, ClosureCandidate, Isochrone, H3FeatureCollection, ChatMapPoint } from "@/lib/api";
 
 const FORMAT_RADIUS: Record<string, number> = {
   flagship: 8,
@@ -24,6 +24,7 @@ interface NetworkMapProps {
   h3Data?: H3FeatureCollection | null;
   h3Metric?: H3Metric;
   filter?: MapFilter;
+  agentPoints?: ChatMapPoint[];
 }
 
 function getQuantileColor(value: number, min: number, max: number): string {
@@ -43,6 +44,7 @@ export function NetworkMap({
   h3Data,
   h3Metric = "total_population",
   filter = "all",
+  agentPoints = [],
 }: NetworkMapProps) {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -60,14 +62,13 @@ export function NetworkMap({
 
   const locationsRef = useRef(locations);
   locationsRef.current = locations;
-
   // Initialize map once
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
     const map = L.map(containerRef.current, {
-      center: [39.8283, -98.5795],
-      zoom: 5,
+      center: [42.5, -75.5],  // NY State center
+      zoom: 7,
       zoomControl: false,
       boxZoom: false,
     });
@@ -127,23 +128,30 @@ export function NetworkMap({
     });
 
     mapRef.current = map;
-    return () => { map.remove(); mapRef.current = null; };
+
+    // Listen for zoom-out event
+    const handleZoomOut = () => map.setView([42.5, -75.5], 7, { animate: true });
+    window.addEventListener("map-zoom-out", handleZoomOut);
+
+    return () => { window.removeEventListener("map-zoom-out", handleZoomOut); map.remove(); mapRef.current = null; };
   }, []);
 
-  // Auto-fit bounds
+  // Auto-fit bounds — only on first load
+  const initialFitDoneRef = useRef(false);
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || locations.length === 0) return;
+    if (!map || locations.length === 0 || initialFitDoneRef.current || agentPoints.length > 0) return;
+    initialFitDoneRef.current = true;
     const points: L.LatLngExpression[] = locations.map((l) => [l.lat, l.lng]);
     if (points.length > 0) {
       map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 12 });
     }
   }, [locations]);
 
-  // Zoom to selection
+  // Zoom to selection — only when user explicitly selects (not in agent-only mode)
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !selectedLocationIds || selectedLocationIds.size === 0) return;
+    if (!map || !selectedLocationIds || selectedLocationIds.size === 0 || locations.length === 0) return;
     const pts = locations.filter((l) => selectedLocationIds.has(l.id)).map((l) => L.latLng(l.lat, l.lng));
     if (pts.length > 0) {
       map.fitBounds(L.latLngBounds(pts), { padding: [60, 60], maxZoom: 14 });
@@ -283,7 +291,54 @@ export function NetworkMap({
     });
     storeGroup.addTo(map);
     layersRef.current.push(storeGroup);
-  }, [locations, competitors, closureIds, isochrones, selectedLocationIds, h3Data, h3Metric, filter]);
+
+    // Agent points — purple diamonds (filter to valid NY-area coords)
+    const validAgentPoints = agentPoints.filter(
+      (pt) => pt.lat && pt.lng && pt.lat > 39 && pt.lat < 46 && pt.lng > -81 && pt.lng < -71
+    );
+    if (validAgentPoints.length > 0) {
+      const agentGroup = L.layerGroup();
+      validAgentPoints.forEach((pt) => {
+        const icon = L.divIcon({
+          className: "",
+          html: `<div style="width:12px;height:12px;background:#a855f7;border:2px solid #fff;border-radius:2px;transform:rotate(45deg);box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>`,
+          iconSize: [12, 12],
+          iconAnchor: [6, 6],
+        });
+        const rev = pt.properties?.projected_revenue;
+        const revStr = rev ? (Number(rev) >= 1000000 ? `$${(Number(rev) / 1000000).toFixed(1)}M` : `$${(Number(rev) / 1000).toFixed(0)}K`) : "";
+        L.marker([pt.lat, pt.lng], { icon })
+          .bindTooltip(
+            `<b>${pt.label || "Agent Result"}</b>${pt.properties?.format ? `<br/>Format: ${pt.properties.format}` : ""}${revStr ? `<br/>Revenue: ${revStr}` : ""}`,
+            { direction: "top", offset: L.point(0, -8) }
+          )
+          .addTo(agentGroup);
+      });
+      agentGroup.addTo(map);
+      layersRef.current.push(agentGroup);
+    } else if (locations.length === 0) {
+      // Agent-only mode with no points yet — show NY
+      map.setView([42.5, -75.5], 7);
+    }
+  }, [locations, competitors, closureIds, isochrones, selectedLocationIds, h3Data, h3Metric, filter, agentPoints]);
+
+  // Separate effect for agent fitBounds — only fires when agentPoints reference changes
+  const lastAgentFitRef = useRef<number>(0);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || agentPoints.length === 0) return;
+    const validPts = agentPoints.filter(
+      (pt) => pt.lat && pt.lng && pt.lat > 39 && pt.lat < 46 && pt.lng > -81 && pt.lng < -71
+    );
+    if (validPts.length === 0) return;
+    const sig = validPts.map((p) => `${p.lat},${p.lng}`).join("|").length;
+    if (sig === lastAgentFitRef.current) return;
+    lastAgentFitRef.current = sig;
+    map.fitBounds(
+      L.latLngBounds(validPts.map((p) => [p.lat, p.lng] as L.LatLngExpression)),
+      { padding: [60, 60], maxZoom: 10 }
+    );
+  }, [agentPoints]);
 
   return (
     <div className="relative w-full h-full bg-white overflow-hidden">

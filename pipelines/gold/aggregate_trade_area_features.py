@@ -132,63 +132,24 @@ print(f"Distance cols ({len(distance_cols)}): {distance_cols}")
 
 # COMMAND ----------
 
-# Build aggregation expressions
-agg_exprs = []
-
-# -- Count variables: SUM (coalesce nulls to 0)
-for v in count_vars:
-    agg_exprs.append(
-        F.sum(F.coalesce(F.col(v), F.lit(0))).cast("long").alias(v)
-    )
-
-# -- POI counts: SUM
-for c in poi_cols:
-    agg_exprs.append(
-        F.sum(F.coalesce(F.col(c), F.lit(0))).cast("long").alias(c)
-    )
-if "total_poi_count" in all_cols:
-    agg_exprs.append(
-        F.sum(F.coalesce(F.col("total_poi_count"), F.lit(0))).cast("long").alias("total_poi_count")
-    )
-
-# -- Competitor counts: SUM
-for c in competitor_cols:
-    agg_exprs.append(
-        F.sum(F.coalesce(F.col(c), F.lit(0))).cast("long").alias(c)
-    )
-if "total_competitor_count" in all_cols:
-    agg_exprs.append(
-        F.sum(F.coalesce(F.col("total_competitor_count"), F.lit(0))).cast("long").alias("total_competitor_count")
-    )
-
-# -- Median/rate variables: population-weighted average
-#    For cells with population data, weight by total_population; fall back to simple avg
-for v in median_vars:
-    agg_exprs.append(
-        F.round(
-            F.when(
-                F.sum(F.when(F.col(v).isNotNull() & F.col("total_population").isNotNull(), F.col("total_population"))) > 0,
-                F.sum(F.when(F.col(v).isNotNull(), F.col(v) * F.coalesce(F.col("total_population"), F.lit(0)))) /
-                F.sum(F.when(F.col(v).isNotNull(), F.coalesce(F.col("total_population"), F.lit(0))))
-            ).otherwise(F.avg(F.col(v))),
-            2,
-        ).alias(v)
-    )
-
-# -- Distance features: MIN (closest facility)
-for c in distance_cols:
-    agg_exprs.append(
-        F.round(F.min(F.col(c)), 2).alias(c)
-    )
-
-# -- Urbanicity score and density
-if "urbanicity_score" in all_cols:
-    agg_exprs.append(F.round(F.avg("urbanicity_score"), 4).alias("urbanicity_score"))
-if "population_density" in all_cols:
-    agg_exprs.append(F.round(F.avg("population_density"), 2).alias("avg_population_density"))
-
-# -- Cell count for transparency
-agg_exprs.append(F.count("h3_cell_id").alias("h3_cell_count"))
+# Build aggregation expressions — single list, no mutation loops
+agg_exprs = (
+    [F.sum(F.coalesce(F.col(v), F.lit(0))).cast("long").alias(v) for v in count_vars]
+    + [F.sum(F.coalesce(F.col(c), F.lit(0))).cast("long").alias(c) for c in poi_cols]
+    + ([F.sum(F.coalesce(F.col("total_poi_count"), F.lit(0))).cast("long").alias("total_poi_count")] if "total_poi_count" in all_cols else [])
+    + [F.sum(F.coalesce(F.col(c), F.lit(0))).cast("long").alias(c) for c in competitor_cols]
+    + ([F.sum(F.coalesce(F.col("total_competitor_count"), F.lit(0))).cast("long").alias("total_competitor_count")] if "total_competitor_count" in all_cols else [])
+    + [F.round(
+        F.when(
+            F.sum(F.when(F.col(v).isNotNull() & F.col("total_population").isNotNull(), F.col("total_population"))) > 0,
+            F.sum(F.when(F.col(v).isNotNull(), F.col(v) * F.coalesce(F.col("total_population"), F.lit(0)))) /
+            F.sum(F.when(F.col(v).isNotNull(), F.coalesce(F.col("total_population"), F.lit(0))))
+        ).otherwise(F.avg(F.col(v))), 2).alias(v) for v in median_vars]
+    + [F.round(F.min(F.col(c)), 2).alias(c) for c in distance_cols]
+    + ([F.round(F.avg("urbanicity_score"), 4).alias("urbanicity_score")] if "urbanicity_score" in all_cols else [])
+    + ([F.round(F.avg("population_density"), 2).alias("avg_population_density")] if "population_density" in all_cols else [])
+    + [F.count("h3_cell_id").alias("h3_cell_count")]
+)
 
 # COMMAND ----------
 

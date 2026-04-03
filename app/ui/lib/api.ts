@@ -153,9 +153,52 @@ export interface SimulationResult {
   avg_site_score: number;
 }
 
+export interface ChatMapPoint {
+  lat: number;
+  lng: number;
+  label: string;
+  properties: Record<string, unknown>;
+}
+
 export interface ChatResponse {
   response: string;
   suggestions: string[];
+  conversation_id?: string;
+  map_points?: ChatMapPoint[];
+}
+
+export interface SaveScenarioParams {
+  scenario_id: string;
+  scenario_summary: string;
+  competitor_year: number;
+  min_distance_from_network_urban: number;
+  min_distance_from_network_suburban: number;
+  min_distance_from_network_rural: number;
+  min_distance_between_new_urban: number;
+  min_distance_between_new_suburban: number;
+  min_distance_between_new_rural: number;
+  final_locations_count: number;
+  excluded_at_risk_count: number;
+  removed_store_count: number;
+  added_location_count: number;
+  total_projected_revenue: number;
+  network_revenue_change: number;
+  cannibalization_rate: number;
+  avg_site_score: number;
+  optimized_locations: Array<{
+    id: string;
+    lat: number;
+    lng: number;
+    format: string;
+    projected_revenue: number;
+    score: number;
+  }>;
+}
+
+export interface SaveScenarioResponse {
+  success: boolean;
+  scenario_id: string;
+  message: string;
 }
 
 export interface H3CellFeature {
@@ -224,6 +267,12 @@ export interface ValidationGeoJSON {
 
 // --- API functions ---
 
+export interface AgentResponse {
+  response: string;
+  map_points: ChatMapPoint[];
+  suggestions: string[];
+}
+
 export const api = {
   listDataSources: () => fetchJson<DataSource[]>("/data-sources"),
   listLocations: (format?: string) =>
@@ -248,10 +297,20 @@ export const api = {
       method: "POST",
       body: JSON.stringify(params),
     }),
-  sendChat: (message: string, context?: Record<string, unknown>, history?: Array<{role: string; content: string}>) =>
+  saveScenario: (params: SaveScenarioParams) =>
+    fetchJson<SaveScenarioResponse>("/save-scenario", {
+      method: "POST",
+      body: JSON.stringify(params),
+    }),
+  sendChat: (message: string, context?: Record<string, unknown>, history?: Array<{role: string; content: string}>, conversationId?: string) =>
     fetchJson<ChatResponse>("/chat", {
       method: "POST",
-      body: JSON.stringify({ message, context, history: history || [] }),
+      body: JSON.stringify({ message, context, history: history || [], conversation_id: conversationId }),
+    }),
+  agentChat: (message: string, pageContext: string, history?: Array<{role: string; content: string}>) =>
+    fetchJson<AgentResponse>("/agent/chat", {
+      method: "POST",
+      body: JSON.stringify({ message, page_context: pageContext, history: history || [] }),
     }),
   listIsochrones: () => fetchJson<Isochrone[]>("/isochrones"),
   getH3Features: (storeId: string) => fetchJson<H3FeatureCollection>(`/h3-features/${storeId}`),

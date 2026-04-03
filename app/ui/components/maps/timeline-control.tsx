@@ -43,7 +43,7 @@ export function TimelineControl({
   const projectedCount = events.filter((e) => e.type === "projected" && e.year <= currentYear).length;
 
   return (
-    <div className="absolute bottom-3 left-4 right-4 z-[1000] bg-white/95 backdrop-blur border border-slate-200 rounded-lg px-4 py-3 shadow-lg">
+    <div data-tour="pg-timeline" className="absolute bottom-3 left-4 right-4 z-[1000] bg-white/95 backdrop-blur border border-slate-200 rounded-lg px-4 py-3 shadow-lg">
       {/* Title row */}
       <div className="flex items-center justify-between mb-2">
         <div>

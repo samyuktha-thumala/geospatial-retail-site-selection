@@ -1,9 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "@/lib/api";
 import type { Location, Competitor, ClosureCandidate, Isochrone, Kpi, H3FeatureCollection } from "@/lib/api";
 import { NetworkMap, type MapFilter, type H3Metric } from "@/components/maps/network-map";
-import { AlertTriangle, Search, ChevronDown, X, TrendingUp, MapPin } from "lucide-react";
+import { GuidedTour, type TourStep } from "@/components/shared/guided-tour";
+import { AlertTriangle, Search, ChevronDown, X, TrendingUp, MapPin, Sparkles } from "lucide-react";
+import { AgentChat } from "@/components/shared/agent-chat";
+import type { AgentResponse } from "@/lib/api";
 
 export const Route = createFileRoute("/_sidebar/network-diagnostics")({
   component: NetworkDiagnosticsPage,
@@ -11,7 +14,6 @@ export const Route = createFileRoute("/_sidebar/network-diagnostics")({
 
 const H3_METRIC_OPTIONS: { value: H3Metric; label: string }[] = [
   { value: "total_population", label: "Population" },
-  { value: "population_density", label: "Pop. Density" },
   { value: "median_household_income", label: "Income" },
   { value: "total_competitor_count", label: "Competition" },
   { value: "total_poi_count", label: "POI Density" },
@@ -49,10 +51,14 @@ function NetworkDiagnosticsPage() {
   const [selectedLocationIds, setSelectedLocationIds] = useState<Set<string>>(new Set());
   const [selectionWarning, setSelectionWarning] = useState<string | null>(null);
 
+  // Agent map points
+  const [agentPoints, setAgentPoints] = useState<AgentResponse["map_points"]>([]);
+  const [agentOnlyMap, setAgentOnlyMap] = useState(false);
+
   // Right panel state
   const [storeSearch, setStoreSearch] = useState("");
   const [selectedRiskId, setSelectedRiskId] = useState<string | null>(null);
-  const [panelSection, setPanelSection] = useState<"top" | "risk" | "search">("top");
+  const [panelSection, setPanelSection] = useState<"agent" | "top" | "risk" | "search">("agent");
 
   useEffect(() => {
     Promise.all([
@@ -130,6 +136,91 @@ function NetworkDiagnosticsPage() {
     setH3Data(null);
   }, []);
 
+  // Tour state
+  const [showTour, setShowTour] = useState(false);
+  useEffect(() => {
+    if (!loading && locations.length > 0) {
+      const seen = localStorage.getItem("tour-network-seen");
+      if (!seen) setShowTour(true);
+    }
+  }, [loading, locations.length]);
+
+  // Listen for tour trigger from top nav button
+  useEffect(() => {
+    const handler = () => setShowTour(true);
+    window.addEventListener("start-tour", handler);
+    return () => window.removeEventListener("start-tour", handler);
+  }, []);
+
+  const tourSteps: TourStep[] = [
+    {
+      target: "kpi-cards",
+      title: "Revenue Overview",
+      description: "Monitor aggregate annual revenue segmented by store format — Express, Standard, and Flagship — alongside active location and competitor counts.",
+      position: "bottom",
+    },
+    {
+      target: "network-map",
+      title: "Network Visualization",
+      description: "View the complete store network across all geographies. Circle size corresponds to store format, providing an at-a-glance view of your market presence.",
+      position: "right",
+      action: () => setFilter("all"),
+    },
+    {
+      target: "filter-express",
+      title: "Express Format",
+      description: "Isolate Express locations — smaller-footprint stores optimized for high-density urban environments.",
+      position: "top",
+      action: () => setFilter("express"),
+    },
+    {
+      target: "filter-standard",
+      title: "Standard Format",
+      description: "View Standard locations — mid-size stores that form the core of the network across suburban and urban markets.",
+      position: "top",
+      action: () => setFilter("standard"),
+    },
+    {
+      target: "filter-flagship",
+      title: "Flagship Format",
+      description: "Highlight Flagship locations — large-format, high-revenue anchor stores positioned in key metropolitan markets.",
+      position: "top",
+      action: () => setFilter("flagship"),
+    },
+    {
+      target: "filter-competitors",
+      title: "Competitive Landscape",
+      description: "Overlay competitor positions across brands to assess competitive density and identify areas of market saturation or opportunity.",
+      position: "top",
+      action: () => setFilter("competitors"),
+    },
+    {
+      target: "filter-at_risk",
+      title: "At-Risk Locations",
+      description: "Surface stores flagged for elevated closure risk based on underperformance metrics. Orange markers indicate locations requiring attention.",
+      position: "top",
+      action: () => { setFilter("at_risk"); setPanelSection("risk"); },
+    },
+    {
+      target: "panel-risk",
+      title: "Risk Analysis",
+      description: "Drill into any at-risk store to review its closure risk score, key underperformance indicators, and variance from network benchmarks.",
+      position: "left",
+    },
+    {
+      target: "panel-risk",
+      title: "AI Site Agent",
+      description: "Switch to the Agent tab for AI-powered analysis — ask about top performers, competitive dynamics, and network insights using natural language.",
+      position: "left",
+    },
+  ];
+
+  const handleTourComplete = useCallback(() => {
+    setShowTour(false);
+    setFilter("all");
+    localStorage.setItem("tour-network-seen", "true");
+  }, []);
+
   // Top 10 locations by monthly sales
   const top10 = [...locations].sort((a, b) => b.monthly_sales - a.monthly_sales).slice(0, 10);
 
@@ -160,9 +251,18 @@ function NetworkDiagnosticsPage() {
     : null;
 
   return (
-    <div className="flex flex-col h-full max-w-[1920px] mx-auto">
+    <div className="flex flex-col h-full max-w-[1920px] mx-auto relative">
+      {/* Tour */}
+      <GuidedTour
+        steps={tourSteps}
+        isOpen={showTour}
+        onComplete={handleTourComplete}
+        introTitle="Network Diagnostics"
+        introDescription="Gain a comprehensive view of your physical footprint. Identify the geographic drivers behind location performance — demographics, competitive density, and economic activity. Investigate at-risk locations to pinpoint the root causes of underperformance, and leverage the AI-powered Site Agent for on-demand network intelligence."
+      />
+
       {/* KPIs + Format Cards — revenue KPIs first, format totals, then count KPIs */}
-      <div className="grid grid-cols-6 gap-3 px-6 pt-5 pb-3 shrink-0">
+      <div data-tour="kpi-cards" className="grid grid-cols-6 gap-3 px-6 pt-5 pb-3 shrink-0">
         {(() => {
           const revenueKpis = kpis.filter((k) => k.label === "Annual Revenue");
           const countKpis = kpis.filter((k) => !k.label.toLowerCase().includes("revenue"));
@@ -252,23 +352,41 @@ function NetworkDiagnosticsPage() {
         {/* Map */}
         <div className="flex-[3] min-w-0 flex flex-col">
           <h3 className="text-base font-bold text-slate-900 mb-1.5">Network Map <span className="text-sm font-normal text-slate-400">— What's driving your locations' performance</span></h3>
-          <div className="flex-1 rounded-lg overflow-hidden border border-slate-200 relative">
+          <div data-tour="network-map" className="flex-1 rounded-lg overflow-hidden border border-slate-200 relative">
           <NetworkMap
-            locations={locations}
-            competitors={competitors}
-            closureCandidates={closureCandidates}
-            isochrones={isochrones}
-            selectedLocationIds={selectedLocationIds}
+            locations={agentOnlyMap ? (() => {
+              // Filter existing store dots to only those matching agent results
+              const agentLabels = new Set(agentPoints.map(p => p.label));
+              const agentNames = new Set(agentPoints.map(p => p.label));
+              const matched = locations.filter(l => agentLabels.has(l.id) || agentNames.has(l.name));
+              return matched.length > 0 ? matched : locations;
+            })() : locations}
+            competitors={agentOnlyMap ? (() => {
+              const agentLabels = new Set(agentPoints.map(p => p.label));
+              const matched = competitors.filter(c => agentLabels.has(c.id));
+              return matched.length > 0 ? matched : [];
+            })() : competitors}
+            closureCandidates={agentOnlyMap ? [] : closureCandidates}
+            isochrones={agentOnlyMap ? [] : isochrones}
+            selectedLocationIds={agentOnlyMap ? new Set() : selectedLocationIds}
             onSelectLocations={handleSelectLocations}
-            h3Data={h3Data}
+            h3Data={agentOnlyMap ? null : h3Data}
             h3Metric={h3Metric}
             filter={filter}
+            agentPoints={(() => {
+              // Only show purple diamonds for points that DON'T match existing stores or competitors
+              const storeNames = new Set(locations.map(l => l.name));
+              const storeIds = new Set(locations.map(l => l.id));
+              const compIds = new Set(competitors.map(c => c.id));
+              return agentPoints.filter(p => !storeNames.has(p.label) && !storeIds.has(p.label) && !compIds.has(p.label));
+            })()}
           />
           {/* Filter bar at bottom of map */}
           <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[1000] bg-white/90 backdrop-blur border border-slate-200 rounded-lg px-1 py-0.5 shadow-sm flex items-center gap-0.5">
             {FILTER_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
+                data-tour={`filter-${opt.value}`}
                 onClick={() => setFilter(opt.value)}
                 className={`px-2.5 py-1 text-[11px] rounded-md transition-colors ${
                   filter === opt.value
@@ -281,7 +399,7 @@ function NetworkDiagnosticsPage() {
             ))}
           </div>
           {/* H3 metric selector — visible on map when single location selected */}
-          {selectedLocationIds.size === 1 && (h3Data || h3Loading) && (
+          {(h3Data || h3Loading) && (
             <div className="absolute top-3 right-14 z-[1000] bg-white/90 backdrop-blur border border-slate-200 rounded-lg px-3 py-2 shadow-sm">
               <p className="text-[10px] text-slate-400 mb-1.5 font-medium">Color hexagons by</p>
               <div className="flex flex-col gap-1">
@@ -306,23 +424,24 @@ function NetworkDiagnosticsPage() {
         </div>
 
         {/* Right Panel: Locations */}
-        <div className="w-[380px] flex flex-col min-w-0 min-h-0 shrink-0">
+        <div data-tour="panel-risk" className="w-[380px] flex flex-col min-w-0 min-h-0 shrink-0">
           <h3 className="text-base font-bold text-slate-900 mb-1.5 shrink-0">Locations <span className="text-sm font-normal text-slate-400">— Let's deep dive</span></h3>
           <div className="flex-1 min-h-0 flex flex-col bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
           {/* Panel tabs */}
           <div className="flex border-b border-slate-100 shrink-0">
             {([
-              { key: "top" as const, label: "Top 10", icon: TrendingUp },
-              { key: "risk" as const, label: `At Risk (${closureCandidates.length})`, icon: AlertTriangle },
-              { key: "search" as const, label: "Search", icon: MapPin },
-            ]).map(({ key, label, icon: Icon }) => (
+              { key: "agent" as const, label: "Agent", icon: Sparkles, accent: true },
+              { key: "top" as const, label: "Top 10", icon: TrendingUp, accent: false },
+              { key: "risk" as const, label: `At Risk (${closureCandidates.length})`, icon: AlertTriangle, accent: false },
+              { key: "search" as const, label: "Search", icon: MapPin, accent: false },
+            ]).map(({ key, label, icon: Icon, accent }) => (
               <button
                 key={key}
-                onClick={() => setPanelSection(key)}
+                onClick={() => { setPanelSection(key); if (key !== "agent") { setAgentOnlyMap(false); } }}
                 className={`flex-1 flex items-center justify-center gap-1 px-2 py-2 text-[10px] font-medium transition-colors ${
                   panelSection === key
-                    ? "text-slate-900 border-b-2 border-slate-800"
-                    : "text-slate-400 hover:text-slate-600"
+                    ? accent ? "text-violet-700 border-b-2 border-violet-500 bg-violet-50" : "text-slate-900 border-b-2 border-slate-800"
+                    : accent ? "text-violet-400 hover:text-violet-600" : "text-slate-400 hover:text-slate-600"
                 }`}
               >
                 <Icon size={11} />
@@ -491,6 +610,45 @@ function NetworkDiagnosticsPage() {
                 </div>
               </div>
             )}
+
+            {/* Agent Chat — always mounted, hidden when other tab active */}
+            <div className={panelSection === "agent" ? "flex flex-col h-full" : "hidden"}>
+                {agentPoints.length > 0 && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-100 shrink-0">
+                    <label className="flex items-center gap-1.5 text-[10px] text-slate-500 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={agentOnlyMap}
+                        onChange={(e) => setAgentOnlyMap(e.target.checked)}
+                        className="rounded border-slate-300 text-violet-500 focus:ring-violet-400 w-3 h-3"
+                      />
+                      Agent results only
+                    </label>
+                    <button
+                      onClick={() => {
+                        // Just zoom out to NY state level — keep agent points visible
+                        const map = document.querySelector('[data-tour="network-map"]');
+                        if (map) {
+                          // Dispatch a custom event the map listens for
+                          window.dispatchEvent(new CustomEvent("map-zoom-out"));
+                        }
+                      }}
+                      className="text-[10px] text-blue-500 hover:text-blue-700 font-medium ml-auto"
+                    >
+                      Zoom out
+                    </button>
+                  </div>
+                )}
+                <AgentChat
+                  pageContext="network"
+                  onMapPoints={(pts) => { setAgentPoints(pts); setAgentOnlyMap(true); }}
+                  onH3Trigger={(storeId) => {
+                    setSelectedLocationIds(new Set([storeId]));
+                    setAgentOnlyMap(false);
+                  }}
+                  className="border-0 shadow-none rounded-none flex-1 min-h-0"
+                />
+            </div>
           </div>
           </div>
         </div>

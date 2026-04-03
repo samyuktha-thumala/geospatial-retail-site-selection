@@ -216,7 +216,6 @@ export function ScenarioPanel({ onSimulate, isLoading, closureCandidates = [] }:
                       className="rounded border-slate-300 bg-white text-orange-500 focus:ring-orange-500 focus:ring-offset-0 w-3.5 h-3.5"
                     />
                     <span className="truncate flex-1">{cc.name}</span>
-                    <span className="text-[10px] text-orange-500 font-medium shrink-0">{(cc.risk * 100).toFixed(0)}%</span>
                   </label>
                 ))}
               </div>

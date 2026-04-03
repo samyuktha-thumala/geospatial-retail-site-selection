@@ -86,8 +86,10 @@ poi_cats = [c for c in poi_pivot.columns if c != "h3_cell_id"]
 poi_pivot = poi_pivot.fillna(0, subset=poi_cats)
 poi_pivot = poi_pivot.withColumn("total_poi_count", sum(F.col(c) for c in poi_cats))
 
-for c in poi_cats:
-    poi_pivot = poi_pivot.withColumnRenamed(c, f"poi_count_{c}")
+poi_pivot = poi_pivot.select(
+    "h3_cell_id", "total_poi_count",
+    *[F.col(c).alias(f"poi_count_{c}") for c in poi_cats]
+)
 
 print(f"POI features: {len(poi_cats)} categories")
 
@@ -208,8 +210,10 @@ comp_total = comp_h3.filter(F.col("brand").isNotNull()).groupBy("h3_cell_id").ag
 
 comp_brand = comp_h3.filter(F.col("brand").isNotNull()).groupBy("h3_cell_id").pivot("brand").agg(F.count("brand"))
 brand_cols = [c for c in comp_brand.columns if c != "h3_cell_id"]
-for c in brand_cols:
-    comp_brand = comp_brand.withColumnRenamed(c, f"competitor_count_{c.replace(' ', '_')}")
+comp_brand = comp_brand.select(
+    "h3_cell_id",
+    *[F.col(f"`{c}`").alias(f"competitor_count_{c.replace(' ', '_')}") for c in brand_cols]
+)
 
 comp_features = comp_total.join(comp_brand, "h3_cell_id", "left")
 comp_all_cols = [c for c in comp_features.columns if c != "h3_cell_id"]
@@ -273,8 +277,10 @@ comp_dist = spark.sql(f"""
 
 comp_dist_pivot = comp_dist.groupBy("h3_cell_id").pivot("brand").agg(F.first("min_dist"))
 dist_brand_cols = [c for c in comp_dist_pivot.columns if c != "h3_cell_id"]
-for c in dist_brand_cols:
-    comp_dist_pivot = comp_dist_pivot.withColumnRenamed(c, f"distance_to_{c.lower().replace(' ', '_')}_miles")
+comp_dist_pivot = comp_dist_pivot.select(
+    "h3_cell_id",
+    *[F.col(f"`{c}`").alias(f"distance_to_{c.lower().replace(' ', '_')}_miles") for c in dist_brand_cols]
+)
 
 distance_features = store_dist.join(comp_dist_pivot, "h3_cell_id", "left")
 dist_all_cols = [c for c in distance_features.columns if c.startswith("distance_to_")]
