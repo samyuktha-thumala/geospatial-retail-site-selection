@@ -38,9 +38,7 @@ h3_features = spark.table(f"{catalog}.{schema}.silver_h3_features").drop("proces
 # Drop columns from H3 that conflict with isochrone columns or aren't needed for aggregation
 h3_drop_cols = ["h3_geometry", "processing_timestamp", "urbanicity_category"]
 h3_cleaned = spark.table(f"{catalog}.{schema}.silver_h3_features")
-for c in h3_drop_cols:
-    if c in h3_cleaned.columns:
-        h3_cleaned = h3_cleaned.drop(c)
+h3_cleaned = h3_cleaned.drop(*[c for c in h3_drop_cols if c in h3_cleaned.columns])
 h3_cleaned.createOrReplaceTempView("_h3_clean")
 
 ta_with_features = spark.sql(f"""
@@ -87,36 +85,20 @@ distance_cols = [c for c in all_cols if c.startswith("distance_to_")]
 
 # COMMAND ----------
 
-agg_exprs = []
-
-# Count variables: sum across H3 cells in trade area
-for v in count_vars:
-    agg_exprs.append(F.sum(F.coalesce(F.col(v), F.lit(0))).cast("long").alias(v))
-
-# POI counts: sum
-for c in poi_cols:
-    agg_exprs.append(F.sum(F.coalesce(F.col(c), F.lit(0))).cast("long").alias(c))
-agg_exprs.append(F.sum(F.coalesce(F.col("total_poi_count"), F.lit(0))).cast("long").alias("total_poi_count"))
-
-# Competitor counts: sum
-for c in competitor_cols:
-    agg_exprs.append(F.sum(F.coalesce(F.col(c), F.lit(0))).cast("long").alias(c))
-agg_exprs.append(F.sum(F.coalesce(F.col("total_competitor_count"), F.lit(0))).cast("long").alias("total_competitor_count"))
-
-# Median/rate variables: average across cells
-for v in median_vars:
-    agg_exprs.append(F.round(F.avg(F.col(v)), 2).alias(v))
-
-# Distance features: min (closest)
-for c in distance_cols:
-    agg_exprs.append(F.round(F.min(F.col(c)), 2).alias(c))
-
-# Urbanicity and density
-agg_exprs.extend([
-    F.round(F.avg("urbanicity_score"), 4).alias("urbanicity_score"),
-    F.round(F.avg("population_density"), 2).alias("avg_population_density"),
-    F.count("h3_cell_id").alias("h3_cell_count"),
-])
+agg_exprs = (
+    [F.sum(F.coalesce(F.col(v), F.lit(0))).cast("long").alias(v) for v in count_vars]
+    + [F.sum(F.coalesce(F.col(c), F.lit(0))).cast("long").alias(c) for c in poi_cols]
+    + [F.sum(F.coalesce(F.col("total_poi_count"), F.lit(0))).cast("long").alias("total_poi_count")]
+    + [F.sum(F.coalesce(F.col(c), F.lit(0))).cast("long").alias(c) for c in competitor_cols]
+    + [F.sum(F.coalesce(F.col("total_competitor_count"), F.lit(0))).cast("long").alias("total_competitor_count")]
+    + [F.round(F.avg(F.col(v)), 2).alias(v) for v in median_vars]
+    + [F.round(F.min(F.col(c)), 2).alias(c) for c in distance_cols]
+    + [
+        F.round(F.avg("urbanicity_score"), 4).alias("urbanicity_score"),
+        F.round(F.avg("population_density"), 2).alias("avg_population_density"),
+        F.count("h3_cell_id").alias("h3_cell_count"),
+    ]
+)
 
 ta_agg = ta_with_features.groupBy(
     "location_id", "format", "urbanicity_category",

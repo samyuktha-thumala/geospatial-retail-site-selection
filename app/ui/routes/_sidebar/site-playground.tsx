@@ -1,12 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
-import type { Location, Competitor, Hotspot, ClosureCandidate, Isochrone, NetworkMetrics, SimulationResult } from "@/lib/api";
+import type { Location, Competitor, Hotspot, ClosureCandidate, Isochrone, NetworkMetrics, SimulationResult, SaveScenarioParams } from "@/lib/api";
 import { PlaygroundMap } from "@/components/maps/playground-map";
 import { MapLayerControl, type MapLayer } from "@/components/maps/map-layer-control";
 import { TimelineControl } from "@/components/maps/timeline-control";
 import { ScenarioPanel } from "@/components/shared/scenario-panel";
-import { MapPin, Plus, X, Save, Minus, TrendingUp, ChevronDown, ChevronRight, Trash2 } from "lucide-react";
+import { GuidedTour, type TourStep } from "@/components/shared/guided-tour";
+import { MapPin, Plus, X, Save, Minus, TrendingUp, ChevronDown, ChevronRight, Trash2, Sparkles, SlidersHorizontal } from "lucide-react";
+import { AgentChat } from "@/components/shared/agent-chat";
+import type { AgentResponse } from "@/lib/api";
 
 export const Route = createFileRoute("/_sidebar/site-playground")({
   component: SitePlaygroundPage,
@@ -48,6 +51,8 @@ function SitePlaygroundPage() {
   const [activeScenarioId, setActiveScenarioId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [simulating, setSimulating] = useState(false);
+  const [savingScenarioId, setSavingScenarioId] = useState<string | null>(null);
+  const [savedScenarioIds, setSavedScenarioIds] = useState<Set<string>>(new Set());
 
   const [currentYear, setCurrentYear] = useState(2025);
   const [userLocations, setUserLocations] = useState<Array<{ lat: number; lng: number; format: string; estimated_sales: number; nearest_store: string }>>([]);
@@ -63,6 +68,11 @@ function SitePlaygroundPage() {
 
   // Active tab for add/remove
   const [actionTab, setActionTab] = useState<"add" | "remove">("add");
+
+  // Panel mode: agent (chat) or manual (scenario sliders)
+  const [panelMode, setPanelMode] = useState<"agent" | "manual">("agent");
+  const [agentPoints, setAgentPoints] = useState<AgentResponse["map_points"]>([]);
+  const [agentOnlyMap, setAgentOnlyMap] = useState(false);
 
   const [layers, setLayers] = useState<MapLayer[]>([
     { id: "express", label: "Express", enabled: true, color: "#3b82f6", size: "sm" },
@@ -210,6 +220,59 @@ function SitePlaygroundPage() {
 
   const isValidInput = latInput !== "" && lngInput !== "" && !isNaN(Number(latInput)) && !isNaN(Number(lngInput));
 
+  // Tour state
+  const [showTour, setShowTour] = useState(false);
+  useEffect(() => {
+    if (!loading && locations.length > 0) {
+      const seen = localStorage.getItem("tour-playground-seen");
+      if (!seen) setShowTour(true);
+    }
+  }, [loading, locations.length]);
+
+  useEffect(() => {
+    const handler = () => setShowTour(true);
+    window.addEventListener("start-tour", handler);
+    return () => window.removeEventListener("start-tour", handler);
+  }, []);
+
+  const playgroundTourSteps: TourStep[] = [
+    {
+      target: "pg-metrics",
+      title: "Performance & Opportunity Metrics",
+      description: "Track current network revenue against total whitespace potential — quantifying the untapped revenue opportunity across all candidate expansion sites.",
+      position: "bottom",
+    },
+    {
+      target: "pg-map",
+      title: "Strategic Expansion Map",
+      description: "Visualize your network (blue), competitors (red), high-potential expansion hotspots (yellow), and at-risk locations (orange) in a single unified view. Toggle layers to isolate specific dimensions.",
+      position: "right",
+    },
+    {
+      target: "pg-timeline",
+      title: "Competitor Growth Over Time",
+      description: "Project competitive landscape evolution from 2025 through 2030. Adjust the timeline to assess how competitor density shifts across your target markets.",
+      position: "top",
+    },
+    {
+      target: "pg-scenario",
+      title: "Scenario Configuration",
+      description: "Define distance constraints by urbanicity tier (urban, suburban, rural), set the target location count, and execute the greedy optimizer to generate a revenue-maximizing expansion plan.",
+      position: "left",
+    },
+    {
+      target: "pg-actions",
+      title: "Network Modifications",
+      description: "Add candidate locations by coordinates or remove existing stores to model what-if scenarios. Changes feed directly into the optimizer for real-time impact analysis.",
+      position: "top",
+    },
+  ];
+
+  const handleTourComplete = useCallback(() => {
+    setShowTour(false);
+    localStorage.setItem("tour-playground-seen", "true");
+  }, []);
+
   // Filter out removed stores
   const activeLocations = locations.filter((l) => !removedStoreIds.has(l.id));
 
@@ -264,22 +327,38 @@ function SitePlaygroundPage() {
     setLayers((prev) => prev.map((l) => l.id === "finalLocations" ? { ...l, enabled: true } : l));
   };
 
-  const handleExportScenario = (scenario: SavedScenario) => {
-    const data = {
-      timestamp: new Date().toISOString(),
-      title: scenario.title,
-      params: scenario.params,
-      optimized_locations: scenario.result.optimized_locations,
-      total_projected_revenue: scenario.result.total_projected_revenue,
-      network_revenue_change: scenario.result.network_revenue_change,
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `scenario_${scenario.id}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleSaveScenarioToCatalog = async (scenario: SavedScenario) => {
+    setSavingScenarioId(scenario.id);
+    try {
+      const params: SaveScenarioParams = {
+        scenario_id: scenario.id,
+        scenario_summary: scenario.title,
+        competitor_year: scenario.params.competitorYear,
+        min_distance_from_network_urban: scenario.params.minDistanceFromNetwork.urban,
+        min_distance_from_network_suburban: scenario.params.minDistanceFromNetwork.suburban,
+        min_distance_from_network_rural: scenario.params.minDistanceFromNetwork.rural,
+        min_distance_between_new_urban: scenario.params.minDistanceBetweenNew.urban,
+        min_distance_between_new_suburban: scenario.params.minDistanceBetweenNew.suburban,
+        min_distance_between_new_rural: scenario.params.minDistanceBetweenNew.rural,
+        final_locations_count: scenario.params.finalLocationsCount,
+        excluded_at_risk_count: scenario.params.excludedCount,
+        removed_store_count: scenario.params.removedCount,
+        added_location_count: scenario.params.addedCount,
+        total_projected_revenue: scenario.result.total_projected_revenue,
+        network_revenue_change: scenario.result.network_revenue_change,
+        cannibalization_rate: scenario.result.cannibalization_rate,
+        avg_site_score: scenario.result.avg_site_score,
+        optimized_locations: scenario.result.optimized_locations,
+      };
+      const res = await api.saveScenario(params);
+      if (res.success) {
+        setSavedScenarioIds((prev) => new Set(prev).add(scenario.id));
+      }
+    } catch {
+      // silent fail — button stays enabled for retry
+    } finally {
+      setSavingScenarioId(null);
+    }
   };
 
   // Active scenario for map display and metric cards
@@ -287,8 +366,17 @@ function SitePlaygroundPage() {
 
   return (
     <div className="flex flex-col max-w-[1920px] mx-auto w-full overflow-y-auto h-full">
+      {/* Tour */}
+      <GuidedTour
+        steps={playgroundTourSteps}
+        isOpen={showTour}
+        onComplete={handleTourComplete}
+        introTitle="Site Playground"
+        introDescription="Translate network performance insights into actionable expansion strategy. Evaluate whitespace opportunities across your geographic footprint, selecting locations with the highest revenue potential. Model competitive growth trajectories through 2030, optimize for population coverage and revenue uplift, and build scenario-driven expansion plans tailored to your strategic priorities."
+      />
+
       {/* Metric Cards */}
-      <div className="grid grid-cols-5 gap-3 px-6 pt-5 pb-3 shrink-0">
+      <div data-tour="pg-metrics" className="grid grid-cols-5 gap-3 px-6 pt-5 pb-3 shrink-0">
         <MetricCard label="Current Revenue" value={networkMetrics?.total_current_revenue || "$0"} />
         <MetricCard
           label="Whitespace Potential"
@@ -304,17 +392,25 @@ function SitePlaygroundPage() {
       {/* Map + Scenario Panel side by side — fixed height, never shrinks */}
       <div className="flex gap-3 mx-6 mb-2 shrink-0" style={{ height: "calc(100vh - 200px)", minHeight: "500px" }}>
         {/* Map */}
-        <div className="flex-1 relative rounded-lg overflow-hidden border border-slate-200 min-w-0">
+        <div data-tour="pg-map" className="flex-1 relative rounded-lg overflow-hidden border border-slate-200 min-w-0">
           <PlaygroundMap
-            locations={activeLocations}
-            competitors={competitors}
-            hotspots={hotspots}
-            closureCandidates={closureCandidates}
-            isochrones={isochrones}
-            layers={layerState}
-            userLocations={userLocations}
-            optimizedLocations={activeScenario?.result.optimized_locations || []}
+            locations={agentOnlyMap ? [] : activeLocations}
+            competitors={agentOnlyMap ? [] : competitors}
+            hotspots={agentOnlyMap ? (() => {
+              if (agentPoints.length === 0) return [];
+              // Match by lat/lng at 3 decimal places (~111m tolerance)
+              const agentCoords = new Set(agentPoints.map(p => `${p.lat.toFixed(3)},${p.lng.toFixed(3)}`));
+              const matched = hotspots.filter(h => agentCoords.has(`${h.lat.toFixed(3)},${h.lng.toFixed(3)}`));
+              return matched.length > 0 ? matched : [];
+            })() : hotspots}
+            closureCandidates={agentOnlyMap ? [] : closureCandidates}
+            isochrones={agentOnlyMap ? [] : isochrones}
+            layers={agentOnlyMap ? { ...layerState, hotspots: true, competitors: false, closureRisks: false, tradeAreas: false, express: false, standard: false, flagship: false } : layerState}
+            userLocations={agentOnlyMap ? [] : userLocations}
+            optimizedLocations={agentOnlyMap ? [] : (activeScenario?.result.optimized_locations || [])}
+            agentPoints={[]}
           />
+
 
           {/* Map Layer Control */}
           <MapLayerControl layers={layers} onToggle={handleToggleLayer} />
@@ -329,18 +425,71 @@ function SitePlaygroundPage() {
           />
         </div>
 
-        {/* Scenario Panel — outside map, scrollable */}
-        <div className="w-72 shrink-0 overflow-y-auto">
-          <ScenarioPanel
-            onSimulate={handleSimulate}
-            isLoading={simulating}
-            closureCandidates={closureCandidates.map((cc) => ({ id: cc.id, name: cc.name, risk: cc.closure_risk }))}
-          />
+        {/* Right Panel — Manual or Agent */}
+        <div data-tour="pg-scenario" className="w-[380px] shrink-0 flex flex-col min-h-0">
+          {/* Mode toggle */}
+          <div className="flex items-center gap-0.5 mb-2 bg-slate-100 rounded-lg p-0.5 shrink-0">
+            <button
+              onClick={() => setPanelMode("agent")}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] font-medium rounded-md transition-colors ${
+                panelMode === "agent" ? "bg-violet-100 text-violet-700 shadow-sm" : "text-slate-400 hover:text-slate-600"
+              }`}
+            >
+              <Sparkles size={12} />
+              Site Agent
+            </button>
+            <button
+              onClick={() => { setPanelMode("manual"); setAgentOnlyMap(false); setAgentPoints([]); }}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-[11px] font-medium rounded-md transition-colors ${
+                panelMode === "manual" ? "bg-white text-slate-800 shadow-sm" : "text-slate-400 hover:text-slate-600"
+              }`}
+            >
+              <SlidersHorizontal size={12} />
+              Manual
+            </button>
+          </div>
+
+          {/* Manual panel — hidden when agent active */}
+          <div className={panelMode === "manual" ? "flex-1 overflow-y-auto min-h-0" : "hidden"}>
+            <ScenarioPanel
+              onSimulate={handleSimulate}
+              isLoading={simulating}
+              closureCandidates={closureCandidates.map((cc) => ({ id: cc.id, name: cc.name, risk: cc.closure_risk }))}
+            />
+          </div>
+
+          {/* Agent panel — always mounted, hidden when manual active */}
+          <div className={panelMode === "agent" ? "flex-1 min-h-0 flex flex-col" : "hidden"}>
+            {agentPoints.length > 0 && (
+              <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-100 shrink-0">
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-500 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={agentOnlyMap}
+                    onChange={(e) => setAgentOnlyMap(e.target.checked)}
+                    className="rounded border-slate-300 text-violet-500 focus:ring-violet-400 w-3 h-3"
+                  />
+                  Agent results only
+                </label>
+                <button
+                  onClick={() => window.dispatchEvent(new CustomEvent("map-zoom-out"))}
+                  className="text-[10px] text-blue-500 hover:text-blue-700 font-medium ml-auto"
+                >
+                  Zoom out
+                </button>
+              </div>
+            )}
+            <AgentChat
+              pageContext="expansion"
+              onMapPoints={(pts) => { setAgentPoints(pts); setAgentOnlyMap(true); }}
+              className="flex-1 min-h-0 border-0 shadow-none rounded-none"
+            />
+          </div>
         </div>
       </div>
 
       {/* Add/Remove Locations — below map, scrollable area */}
-      <div className="border-t border-slate-200 bg-white px-6 py-3 shrink-0 overflow-y-auto">
+      <div data-tour="pg-actions" className="border-t border-slate-200 bg-white px-6 py-3 shrink-0 overflow-y-auto">
         <div className="flex items-start gap-6">
           {/* Action tabs + form */}
           <div className="shrink-0">
@@ -523,9 +672,10 @@ function SitePlaygroundPage() {
                     )}
                     {isActive && <span className="text-[10px] text-emerald-600 font-medium px-2">Active</span>}
                     <button
-                      onClick={(e) => { e.stopPropagation(); handleExportScenario(scenario); }}
-                      className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-blue-500 transition-colors"
-                      title="Export JSON"
+                      onClick={(e) => { e.stopPropagation(); handleSaveScenarioToCatalog(scenario); }}
+                      disabled={savingScenarioId === scenario.id || savedScenarioIds.has(scenario.id)}
+                      className={`p-1 rounded transition-colors ${savedScenarioIds.has(scenario.id) ? "text-emerald-500 cursor-default" : "text-slate-400 hover:bg-slate-100 hover:text-blue-500"} disabled:opacity-50`}
+                      title={savedScenarioIds.has(scenario.id) ? "Saved" : "Save to catalog"}
                     >
                       <Save size={11} />
                     </button>

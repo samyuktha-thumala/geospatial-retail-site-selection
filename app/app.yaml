@@ -17,3 +17,5 @@ env:
     value: "YOUR_CATALOG"            # <- your Unity Catalog name
   - name: DATABRICKS_SCHEMA
     value: "YOUR_SCHEMA"             # <- schema where tables live
+  - name: GENIE_SPACE_ID
+    value: "YOUR_GENIE_SPACE_ID"     # <- Genie space ID for the chatbot

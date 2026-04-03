@@ -8,6 +8,15 @@ variables:
   warehouse_id:
     description: "SQL Warehouse ID for the Databricks App"
     default: ""
+  catalog:
+    description: "Unity Catalog name"
+    default: ""
+  schema:
+    description: "Schema name"
+    default: ""
+  genie_space_id:
+    description: "Genie Space ID for the chatbot"
+    default: ""
 
 targets:
   dev:
@@ -15,7 +24,17 @@ targets:
     mode: development
     workspace:
       profile: YOUR_PROFILE    # <- set to your Databricks CLI profile
+    variables:
+      warehouse_id: "YOUR_WAREHOUSE_ID"
+      catalog: "YOUR_CATALOG"
+      schema: "YOUR_SCHEMA"
+      genie_space_id: "YOUR_GENIE_SPACE_ID"
   prod:
     mode: production
     workspace:
       profile: YOUR_PROFILE    # <- set to your Databricks CLI profile
+    variables:
+      warehouse_id: "YOUR_WAREHOUSE_ID"
+      catalog: "YOUR_CATALOG"
+      schema: "YOUR_SCHEMA"
+      genie_space_id: "YOUR_GENIE_SPACE_ID"

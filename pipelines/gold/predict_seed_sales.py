@@ -140,14 +140,12 @@ exploded_df = exploded_df.withColumn(
 # COMMAND ----------
 
 # Convert to pandas for scoring (~1500 rows — perfectly fine)
-keep_cols = ["location_id", "format_name", "store_sqft", "sqft_market_ratio", "market_capacity_sqft",
-             "lat", "lng", "urbanicity_category", "total_population", "median_household_income",
-             "total_poi_count", "total_competitor_count", "higher_education_rate",
-             "urbanicity_score", "distance_to_nearest_store_miles"]
-# Add all feature cols that exist
-for c in feature_cols:
-    if c not in keep_cols:
-        keep_cols.append(c)
+keep_cols = list(dict.fromkeys([
+    "location_id", "format_name", "store_sqft", "sqft_market_ratio", "market_capacity_sqft",
+    "lat", "lng", "urbanicity_category", "total_population", "median_household_income",
+    "total_poi_count", "total_competitor_count", "higher_education_rate",
+    "urbanicity_score", "distance_to_nearest_store_miles",
+] + feature_cols))
 
 pdf = exploded_df.select(*[c for c in keep_cols if c in exploded_df.columns]).toPandas()
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
-import type { Location, Competitor, Hotspot, ClosureCandidate, Isochrone } from "@/lib/api";
+import type { Location, Competitor, Hotspot, ClosureCandidate, Isochrone, ChatMapPoint } from "@/lib/api";
 
 const FORMAT_RADIUS: Record<string, number> = {
   flagship: 8,
@@ -23,7 +23,8 @@ interface PlaygroundMapProps {
   isochrones?: Isochrone[];
   layers: Record<string, boolean>;
   userLocations?: Array<{ lat: number; lng: number; format: string; estimated_sales?: number; nearest_store?: string }>;
-  optimizedLocations?: Array<{ lat: number; lng: number; format: string; score: number }>;
+  optimizedLocations?: Array<{ lat: number; lng: number; format: string; projected_revenue: number; score: number }>;
+  agentPoints?: ChatMapPoint[];
 }
 
 export function PlaygroundMap({
@@ -35,6 +36,7 @@ export function PlaygroundMap({
   layers,
   userLocations = [],
   optimizedLocations = [],
+  agentPoints = [],
 }: PlaygroundMapProps) {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -44,8 +46,8 @@ export function PlaygroundMap({
     if (!containerRef.current || mapRef.current) return;
 
     const map = L.map(containerRef.current, {
-      center: [39.8283, -98.5795],
-      zoom: 5,
+      center: [42.5, -75.5],  // NY State center
+      zoom: 7,
       zoomControl: false,
     });
 
@@ -60,13 +62,19 @@ export function PlaygroundMap({
     ).addTo(map);
 
     mapRef.current = map;
-    return () => { map.remove(); mapRef.current = null; };
+
+    const handleZoomOut = () => map.setView([42.5, -75.5], 7, { animate: true });
+    window.addEventListener("map-zoom-out", handleZoomOut);
+
+    return () => { window.removeEventListener("map-zoom-out", handleZoomOut); map.remove(); mapRef.current = null; };
   }, []);
 
-  // Auto-fit bounds
+  // Auto-fit bounds — only on first load, not on every locations change
+  const initialFitDoneRef = useRef(false);
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || locations.length === 0) return;
+    if (!map || locations.length === 0 || initialFitDoneRef.current || agentPoints.length > 0) return;
+    initialFitDoneRef.current = true;
     const points: L.LatLngExpression[] = locations.map((l) => [l.lat, l.lng]);
     if (points.length > 0) {
       map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 12 });
@@ -130,7 +138,7 @@ export function PlaygroundMap({
           weight: 1.5,
         })
           .bindTooltip(
-            `<b>Hotspot ${hs.id}</b><br/>Score: ${hs.score}<br/>Projected: $${hs.projected_sales}K/mo`,
+            `<b>Hotspot ${hs.id}</b><br/>Projected Annual Revenue: ${(() => { const annual = hs.projected_sales * 12; return annual >= 1000 ? `$${(annual / 1000).toFixed(1)}M` : `$${Math.round(annual)}K`; })()}`,
             { direction: "top", offset: L.point(0, -6) }
           )
           .addTo(hotGroup);
@@ -151,7 +159,7 @@ export function PlaygroundMap({
         });
         L.marker([cc.lat, cc.lng], { icon })
           .bindTooltip(
-            `<b>${cc.name}</b><br/>Risk: ${(cc.closure_risk * 100).toFixed(0)}%<br/>${cc.reason}`,
+            `<b>${cc.name}</b><br/>${cc.reason}`,
             { direction: "top", offset: L.point(0, -7) }
           )
           .addTo(riskGroup);
@@ -192,7 +200,7 @@ export function PlaygroundMap({
           weight: 2,
         })
           .bindTooltip(
-            `<b>Optimized Site</b><br/>Format: ${ol.format}<br/>Score: ${ol.score}`,
+            `<b>Optimized Site</b><br/>Format: ${ol.format}<br/>Est. Revenue: $${ol.projected_revenue >= 1000 ? (ol.projected_revenue / 1000).toFixed(1) + "M" : ol.projected_revenue.toFixed(0) + "K"}/yr`,
             { direction: "top", offset: L.point(0, -9) }
           )
           .addTo(optGroup);
@@ -221,7 +229,57 @@ export function PlaygroundMap({
     }
     userGroup.addTo(map);
     layerGroupsRef.current.userLocations = userGroup;
-  }, [locations, competitors, hotspots, closureCandidates, isochrones, layers, userLocations, optimizedLocations]);
+
+    // Agent points — purple diamond markers (filter to valid NY-area coords)
+    const agentGroup = L.layerGroup();
+    const validAgentPts = agentPoints.filter(
+      (pt) => pt.lat && pt.lng && pt.lat > 39 && pt.lat < 46 && pt.lng > -81 && pt.lng < -71
+    );
+    if (validAgentPts.length > 0) {
+      validAgentPts.forEach((pt) => {
+        const isOptimized = pt.properties?.type === "optimized_location";
+        const color = isOptimized ? "#8b5cf6" : "#a855f7";
+        const size = isOptimized ? 16 : 12;
+        const icon = L.divIcon({
+          className: "",
+          html: `<div style="width:${size}px;height:${size}px;background:${color};border:2px solid #fff;border-radius:2px;transform:rotate(45deg);box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>`,
+          iconSize: [size, size],
+          iconAnchor: [size / 2, size / 2],
+        });
+        const rev = pt.properties?.projected_revenue;
+        const revStr = rev ? (Number(rev) >= 1000000 ? `$${(Number(rev) / 1000000).toFixed(1)}M` : `$${(Number(rev) / 1000).toFixed(0)}K`) : "";
+        L.marker([pt.lat, pt.lng], { icon })
+          .bindTooltip(
+            `<b>${pt.label || "Agent Result"}</b>${pt.properties?.format ? `<br/>Format: ${pt.properties.format}` : ""}${revStr ? `<br/>Revenue: ${revStr}` : ""}${pt.properties?.total_poi_count ? `<br/>POIs: ${pt.properties.total_poi_count}` : ""}`,
+            { direction: "top", offset: L.point(0, -8) }
+          )
+          .addTo(agentGroup);
+      });
+    } else if (locations.length === 0) {
+      map.setView([42.5, -75.5], 7);
+    }
+    agentGroup.addTo(map);
+    layerGroupsRef.current.agent = agentGroup;
+  }, [locations, competitors, hotspots, closureCandidates, isochrones, layers, userLocations, optimizedLocations, agentPoints]);
+
+  // Separate effect for agent fitBounds — only fires when agentPoints reference changes
+  const lastAgentFitRef = useRef<number>(0);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || agentPoints.length === 0) return;
+    const validPts = agentPoints.filter(
+      (pt) => pt.lat && pt.lng && pt.lat > 39 && pt.lat < 46 && pt.lng > -81 && pt.lng < -71
+    );
+    if (validPts.length === 0) return;
+    // Only fit if these are genuinely new points (avoid re-fit on other state changes)
+    const sig = validPts.map((p) => `${p.lat},${p.lng}`).join("|").length;
+    if (sig === lastAgentFitRef.current) return;
+    lastAgentFitRef.current = sig;
+    map.fitBounds(
+      L.latLngBounds(validPts.map((p) => [p.lat, p.lng] as L.LatLngExpression)),
+      { padding: [60, 60], maxZoom: 10 }
+    );
+  }, [agentPoints]);
 
   return <div ref={containerRef} className="w-full h-full" />;
 }

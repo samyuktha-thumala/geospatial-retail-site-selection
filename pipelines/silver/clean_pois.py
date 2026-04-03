@@ -70,47 +70,35 @@ if poi_count == 0:
 # Extract category and subcategory from tags using UDF
 category_priority = poi_cleaning_config.get('category_priority', ['shop', 'amenity', 'leisure', 'tourism', 'office', 'public_transport', 'railway'])
 
-def get_category_and_subcategory(tags):
-    if tags is None or not isinstance(tags, dict):
-        return (None, None)
-    for category_tag in category_priority:
-        if category_tag in tags:
-            tag_value = tags[category_tag]
-            if tag_value and str(tag_value).strip():
-                return (category_tag, str(tag_value).strip())
-    return (None, None)
-
-category_schema = StructType([
-    StructField("category", StringType(), True),
-    StructField("subcategory", StringType(), True)
-])
-get_category_udf = F.udf(get_category_and_subcategory, category_schema)
-
-# Extract address components
+# Extract category/subcategory — Spark-native, no UDF
 address_fields = poi_cleaning_config.get('address_fields', ['addr:housenumber', 'addr:street', 'addr:city', 'addr:state', 'addr:postcode'])
 
-def build_address(tags):
-    if tags is None or not isinstance(tags, dict):
-        return None
-    parts = []
-    for field in address_fields:
-        if field in tags and tags[field]:
-            parts.append(str(tags[field]))
-    return ', '.join(parts) if parts else None
+category_expr = F.coalesce(*[
+    F.when(
+        F.col("tags")[tag].isNotNull() & (F.trim(F.col("tags")[tag]) != ""),
+        F.struct(F.lit(tag).alias("category"), F.trim(F.col("tags")[tag]).alias("subcategory"))
+    )
+    for tag in category_priority
+])
 
-build_address_udf = F.udf(build_address, StringType())
+# Build address — Spark-native, no UDF
+address_expr = F.concat_ws(", ", *[
+    F.when(F.col("tags")[field].isNotNull(), F.col("tags")[field])
+    for field in address_fields
+])
+address_expr = F.when(address_expr == "", None).otherwise(address_expr)
 
 # Clean POI data
 poi_id_prefix = poi_cleaning_config.get('poi_id_prefix', 'poi_')
 pois_with_category = pois_raw \
     .withColumn("poi_id", F.concat(F.lit(poi_id_prefix), F.col("osm_id"))) \
     .withColumn("name", F.col("tags")["name"]) \
-    .withColumn("category_struct", get_category_udf(F.col("tags"))) \
+    .withColumn("category_struct", category_expr) \
     .withColumn("poi_category", F.col("category_struct.category")) \
     .withColumn("poi_subcategory", F.col("category_struct.subcategory")) \
     .withColumn("latitude", F.col("latitude").cast("double")) \
     .withColumn("longitude", F.col("longitude").cast("double")) \
-    .withColumn("address", build_address_udf(F.col("tags"))) \
+    .withColumn("address", address_expr) \
     .withColumn("ingestion_timestamp", F.lit(datetime.now()))
 
 pois_cleaned = pois_with_category \

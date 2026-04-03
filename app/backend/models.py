@@ -215,10 +215,72 @@ class ChatMessageIn(BaseModel):
     message: str
     context: Optional[dict] = None
     history: list[ChatHistoryMessage] = []
+    conversation_id: Optional[str] = None
+
+
+class ChatMapPoint(BaseModel):
+    lat: float
+    lng: float
+    label: str = ""
+    properties: dict = {}
 
 
 class ChatResponseOut(BaseModel):
     response: str
+    suggestions: list[str] = []
+    conversation_id: Optional[str] = None
+    map_points: list[ChatMapPoint] = []
+
+
+# --- Save Scenario ---
+
+class ScenarioLocationIn(BaseModel):
+    id: str
+    lat: float
+    lng: float
+    format: str
+    projected_revenue: float
+    score: float
+
+
+class SaveScenarioIn(BaseModel):
+    scenario_id: str
+    scenario_summary: str
+    competitor_year: int = 2025
+    min_distance_from_network_urban: float = 1.5
+    min_distance_from_network_suburban: float = 3.0
+    min_distance_from_network_rural: float = 5.0
+    min_distance_between_new_urban: float = 2.0
+    min_distance_between_new_suburban: float = 5.0
+    min_distance_between_new_rural: float = 8.0
+    final_locations_count: int = 10
+    excluded_at_risk_count: int = 0
+    removed_store_count: int = 0
+    added_location_count: int = 0
+    total_projected_revenue: float = 0
+    network_revenue_change: float = 0
+    cannibalization_rate: float = 0
+    avg_site_score: float = 0
+    optimized_locations: list[ScenarioLocationIn] = []
+
+
+class SaveScenarioOut(BaseModel):
+    success: bool
+    scenario_id: str
+    message: str = ""
+
+
+# --- Agent Chat ---
+
+class AgentChatIn(BaseModel):
+    message: str
+    page_context: str = "expansion"  # "network" or "expansion"
+    history: list[ChatHistoryMessage] = []
+
+
+class AgentChatOut(BaseModel):
+    response: str
+    map_points: list[ChatMapPoint] = []
     suggestions: list[str] = []
 
 

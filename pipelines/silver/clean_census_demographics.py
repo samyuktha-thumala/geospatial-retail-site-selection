@@ -46,12 +46,11 @@ cleaned = raw
 # Replace Census sentinel values (-666666666) with NULL across all numeric columns
 geo_cols = {"NAME", "state", "county", "tract", "block_group", "geoid",
             "geography_level", "acs_year", "ingestion_id", "ingestion_timestamp"}
-for col_name in cleaned.columns:
-    if col_name not in geo_cols:
-        cleaned = cleaned.withColumn(
-            col_name,
-            F.when(F.col(col_name) < 0, None).otherwise(F.col(col_name))
-        )
+cleaned = cleaned.select(*[
+    F.when(F.col(c) < 0, None).otherwise(F.col(c)).alias(c)
+    if c not in geo_cols else F.col(c)
+    for c in cleaned.columns
+])
 
 # Derive geoid from component columns if not already present
 if "geoid" not in cleaned.columns and all(c in cleaned.columns for c in ["state", "county", "tract", "block_group"]):
@@ -84,11 +83,11 @@ count_columns = [
 ]
 # Only apply to columns that exist in the table
 existing_count_cols = [c for c in count_columns if c in cleaned.columns]
-for col_name in existing_count_cols:
-    cleaned = cleaned.withColumn(
-        col_name,
-        F.coalesce(F.col(col_name), F.lit(0.0))
-    )
+cleaned = cleaned.select(*[
+    F.coalesce(F.col(c), F.lit(0.0)).alias(c)
+    if c in existing_count_cols else F.col(c)
+    for c in cleaned.columns
+])
 
 # COMMAND ----------
 

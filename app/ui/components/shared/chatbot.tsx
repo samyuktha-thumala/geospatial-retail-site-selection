@@ -21,14 +21,15 @@ export function ChatBot() {
       role: "bot",
       text: "Hello! I can help you analyze site selection data, compare locations, and answer questions about your network. What would you like to know?",
       suggestions: [
-        "Show top performing locations",
-        "Analyze competitor landscape",
-        "Recommend new sites",
+        "Top 10 stores by annual revenue",
+        "Top 20 rural expansion hotspots",
+        "Competitor count by brand",
       ],
     },
   ]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [conversationId, setConversationId] = useState<string | undefined>();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {
@@ -46,7 +47,7 @@ export function ChatBot() {
       if (!detail) return;
       const { lat, lng, name, format, sales } = detail;
       setIsOpen(true);
-      const prompt = `Tell me about ${name} (${format} format, $${sales}K/mo) at coordinates ${lat.toFixed(4)}, ${lng.toFixed(4)}. What's the competitive landscape and performance outlook for this location?`;
+      const prompt = `Show me the annual revenue and monthly sales for the store named "${name}"`;
       // Small delay so the panel opens first
       setTimeout(() => handleSend(prompt), 100);
     };
@@ -76,7 +77,10 @@ export function ChatBot() {
           content: m.text,
         }));
 
-      const response: ChatResponse = await api.sendChat(message, undefined, history);
+      const response: ChatResponse = await api.sendChat(message, undefined, history, conversationId);
+      if (response.conversation_id) {
+        setConversationId(response.conversation_id);
+      }
       const botMsg: Message = {
         id: `bot-${Date.now()}`,
         role: "bot",
@@ -107,6 +111,7 @@ export function ChatBot() {
     <>
       {/* Toggle button */}
       <button
+        data-tour="chatbot-button"
         onClick={() => setIsOpen((prev) => !prev)}
         className={cn(
           "fixed bottom-6 right-6 z-[9999] flex h-14 w-14 items-center justify-center",
@@ -138,7 +143,7 @@ export function ChatBot() {
               <div className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
               <div>
                 <h3 className="text-sm font-semibold text-slate-900 leading-tight">Site Agent</h3>
-                <p className="text-[10px] text-slate-400">powered by Gemini</p>
+                <p className="text-[10px] text-slate-400">powered by Genie</p>
               </div>
             </div>
             <button
