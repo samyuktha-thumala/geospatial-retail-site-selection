@@ -1,8 +1,8 @@
 # Retail SiteLab
 
-**Where should we open the next store?** Traditional site selection relies on gut instinct, spreadsheets, and manual market research — a process that takes months per location and still gets it wrong 30% of the time. This platform combines geospatial analytics, ML-driven revenue prediction, and scenario modeling into a single interactive tool. Retailers using data-driven site selection expand 3-5x faster with higher success rates, and this accelerator proves it's possible with open-source data and Databricks.
+**Where should we open the next store?** Traditional site selection relies on gut instinct, spreadsheets, and manual market research - a process that takes months per location and still gets it wrong 30% of the time. This platform combines geospatial analytics, ML-driven revenue prediction, and scenario modeling into a single interactive tool. Retailers using data-driven site selection expand 3-5x faster with higher success rates, and this accelerator proves it's possible with open-source data and Databricks.
 
-The entire pipeline — from Census data ingestion to H3 hexagonal analysis to XGBoost revenue prediction — runs on Databricks with Unity Catalog governance. The app itself is a full-stack Databricks App with a FastAPI backend and React frontend, deployed via Databricks Asset Bundles.
+The entire pipeline - from Census data ingestion to H3 hexagonal analysis to XGBoost revenue prediction - runs on Databricks with Unity Catalog governance. The app itself is a full-stack Databricks App with a FastAPI backend and React frontend, deployed via Databricks Asset Bundles.
 
 ---
 
@@ -28,11 +28,11 @@ The entire pipeline — from Census data ingestion to H3 hexagonal analysis to X
 
 ### Key Features
 
-- **Network Diagnostics** — Interactive map with H3 trade area analysis, store performance metrics, at-risk detection
-- **Site Playground** — Scenario modeling with a greedy optimizer: add/remove locations, tune per-urbanicity distance constraints, compare scenarios side-by-side
-- **AI Site Agent** — Natural language Q&A about the store network powered by Gemini 2.5 Flash
-- **Revenue Prediction** — XGBoost model predicting $/sqft across 3 store formats (express/standard/flagship), capturing format-market fit dynamics
-- **Competitor Simulation** — Projected competitor growth (2026–2028) with brand-specific expansion rates
+- **Network Diagnostics** - Interactive map with H3 trade area analysis, store performance metrics, at-risk detection
+- **Site Playground** - Scenario modeling with a greedy optimizer: add/remove locations, tune per-urbanicity distance constraints, compare scenarios side-by-side
+- **AI Site Agent** - Natural language Q&A about the store network powered by Gemini 2.5 Flash
+- **Revenue Prediction** - XGBoost model predicting $/sqft across 3 store formats (express/standard/flagship), capturing format-market fit dynamics
+- **Competitor Simulation** - Projected competitor growth (2026-2028) with brand-specific expansion rates
 
 ---
 
@@ -55,9 +55,9 @@ cd geospatial-retail-site-selection
 
 ### 2. Configure Databricks
 
-There are two bundles and one app config to update. All use placeholder values (`YOUR_*`) — just replace them with your own.
+There are two bundles and one app config to update. All use placeholder values (`YOUR_*`) - just replace them with your own.
 
-**`databricks.yml`** (app bundle) — set your CLI profile:
+**`databricks.yml`** (app bundle) - set your CLI profile:
 
 ```yaml
 targets:
@@ -66,7 +66,7 @@ targets:
       profile: YOUR_PROFILE       # ← databricks auth profiles
 ```
 
-**`pipelines/databricks.yml`** (pipeline bundle) — set your CLI profile, catalog, schema, and Census API key:
+**`pipelines/databricks.yml`** (pipeline bundle) - set your CLI profile, catalog, schema, and Census API key:
 
 ```yaml
 targets:
@@ -80,7 +80,7 @@ targets:
       cluster_id: "xxxx-xxxxxx"   # ← cluster with GDAL/pyosmium (for 2 bronze tasks)
 ```
 
-**`app/app.yaml`** — set your SQL Warehouse ID and catalog/schema:
+**`app/app.yaml`** - set your SQL Warehouse ID and catalog/schema:
 
 ```yaml
 env:
@@ -94,7 +94,7 @@ env:
 
 ### 3. Run the data pipeline
 
-> **Note:** The app works without running the pipeline — it falls back to synthetic data. Run the pipeline only if you want real data in your catalog.
+> **Note:** The app works without running the pipeline - it falls back to synthetic data. Run the pipeline only if you want real data in your catalog.
 
 **Prerequisites:**
 - Create a catalog and schema in Unity Catalog: `CREATE CATALOG my_catalog; USE CATALOG my_catalog; CREATE SCHEMA my_schema;`
@@ -104,32 +104,32 @@ Clone the repo as a **Git folder** in your Databricks workspace (Workspace → G
 
 **Run in this order:**
 
-**Step 1 — Exploration** (synthetic store/competitor data — run these first):
-1. `pipelines/exploration/generate_store_locations.py` — ~238 store locations across NY
-2. `pipelines/exploration/generate_competitor_locations.py` — ~400 competitor locations
-3. `pipelines/exploration/generate_seed_points.py` — Expansion candidate seed points
+**Step 1 - Exploration** (synthetic store/competitor data - run these first):
+1. `pipelines/exploration/generate_store_locations.py` - ~238 store locations across NY
+2. `pipelines/exploration/generate_competitor_locations.py` - ~400 competitor locations
+3. `pipelines/exploration/generate_seed_points.py` - Expansion candidate seed points
 
-**Step 2 — Bronze** (raw ingestion from external APIs):
-1. `pipelines/bronze/census_demographics.py` — Census ACS demographics (needs `census_api_key`)
-2. `pipelines/bronze/census_boundaries.py` — TIGER/Line block group boundaries
-3. `pipelines/bronze/osm_download.py` — OpenStreetMap data from Geofabrik
-4. `pipelines/bronze/extract_pois.py` — Points of Interest from OSM
+**Step 2 - Bronze** (raw ingestion from external APIs):
+1. `pipelines/bronze/census_demographics.py` - Census ACS demographics (needs `census_api_key`)
+2. `pipelines/bronze/census_boundaries.py` - TIGER/Line block group boundaries
+3. `pipelines/bronze/osm_download.py` - OpenStreetMap data from Geofabrik
+4. `pipelines/bronze/extract_pois.py` - Points of Interest from OSM
 
-**Step 3 — Silver** (cleaning & feature engineering):
-1. `pipelines/silver/clean_census_demographics.py` — Clean and derive rates
-2. `pipelines/silver/census_zcta.py` — ZCTA boundaries + demographics (needs `census_api_key`)
-3. `pipelines/silver/clean_pois.py` — Filter and structure POIs
-4. `pipelines/silver/create_h3_features.py` — H3 hex features (demographics, POIs, competitors)
-5. `pipelines/silver/generate_seed_points.py` — Score and filter expansion candidates
-6. `pipelines/silver/create_isochrones_valhalla.py` — Drive-time trade area polygons (calls Valhalla public API)
+**Step 3 - Silver** (cleaning & feature engineering):
+1. `pipelines/silver/clean_census_demographics.py` - Clean and derive rates
+2. `pipelines/silver/census_zcta.py` - ZCTA boundaries + demographics (needs `census_api_key`)
+3. `pipelines/silver/clean_pois.py` - Filter and structure POIs
+4. `pipelines/silver/create_h3_features.py` - H3 hex features (demographics, POIs, competitors)
+5. `pipelines/silver/generate_seed_points.py` - Score and filter expansion candidates
+6. `pipelines/silver/create_isochrones_valhalla.py` - Drive-time trade area polygons (calls Valhalla public API)
 
-**Step 4 — Gold** (ML & scoring):
-1. `pipelines/gold/aggregate_trade_area_features.py` — Aggregate features within store trade areas
-2. `pipelines/gold/generate_store_sales.py` — Revenue per sqft model
-3. `pipelines/gold/train_sales_model.py` — Train XGBoost, log to MLflow
-4. `pipelines/gold/aggregate_seed_trade_area_features.py` — Aggregate features for seed points
-5. `pipelines/gold/predict_seed_sales.py` — Score seed points with trained model
-6. `pipelines/gold/simulate_competitor_growth.py` — Project competitor expansion (2026–2028)
+**Step 4 - Gold** (ML & scoring):
+1. `pipelines/gold/aggregate_trade_area_features.py` - Aggregate features within store trade areas
+2. `pipelines/gold/generate_store_sales.py` - Revenue per sqft model
+3. `pipelines/gold/train_sales_model.py` - Train XGBoost, log to MLflow
+4. `pipelines/gold/aggregate_seed_trade_area_features.py` - Aggregate features for seed points
+5. `pipelines/gold/predict_seed_sales.py` - Score seed points with trained model
+6. `pipelines/gold/simulate_competitor_growth.py` - Project competitor expansion (2026-2028)
 
 ### 4. Build and deploy the app
 
