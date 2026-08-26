@@ -1,5 +1,6 @@
 import math
 import json
+import os
 import logging
 from typing import Optional
 from fastapi import APIRouter
@@ -18,6 +19,13 @@ from .data.store import db
 logger = logging.getLogger(__name__)
 
 api = APIRouter(prefix=conf.api_prefix)
+
+
+@api.get("/config", operation_id="getAppConfig")
+async def get_app_config():
+    """Runtime branding/config so the same frontend bundle can serve multiple apps."""
+    brand = os.environ.get("APP_BRAND", "default").lower().strip()
+    return {"brand": brand}
 
 
 @api.get("/data-sources", response_model=list[DataSourceOut], operation_id="listDataSources")
@@ -222,6 +230,8 @@ async def agent_chat(body: AgentChatIn):
         message=body.message,
         history=history,
         page_context=body.page_context,
+        benchmark=body.benchmark,
+        closure_candidates=body.closure_candidates,
     )
     return AgentChatOut(
         response=result["response"],

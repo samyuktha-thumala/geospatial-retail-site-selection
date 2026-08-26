@@ -77,3 +77,52 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* ============================================================
+   Dollar General brand override.
+   Scoped to [data-brand="dollar_general"] (set at runtime by lib/brand.ts)
+   so the same shared bundle leaves the default (violet) theme untouched.
+   Remaps the app's violet "agent accent" to DG yellow (#FFD400) / near-black
+   (#231F20). Contrast-corrected: dark text/icons on light surfaces, dark text
+   on yellow fills.
+   ============================================================ */
+[data-brand="dollar_general"] {
+  --dg-yellow: #FFD400;
+  --dg-yellow-dark: #E6BF00;
+  --dg-black: #231F20;
+  --dg-yellow-tint: #FFF7CC;
+}
+
+/* Text accents -> DG black (readable on white) */
+[data-brand="dollar_general"] .text-violet-400,
+[data-brand="dollar_general"] .text-violet-500,
+[data-brand="dollar_general"] .text-violet-600,
+[data-brand="dollar_general"] .text-violet-700,
+[data-brand="dollar_general"] .text-violet-800 { color: var(--dg-black) !important; }
+
+[data-brand="dollar_general"] .hover\:text-violet-500:hover,
+[data-brand="dollar_general"] .hover\:text-violet-600:hover { color: var(--dg-black) !important; }
+
+/* Tint backgrounds -> soft DG yellow tint */
+[data-brand="dollar_general"] .bg-violet-50,
+[data-brand="dollar_general"] .bg-violet-100,
+[data-brand="dollar_general"] .from-violet-50 { background-color: var(--dg-yellow-tint) !important; }
+[data-brand="dollar_general"] .hover\:bg-violet-50:hover { background-color: var(--dg-yellow-tint) !important; }
+
+/* Filled accents (send button, user chat bubble, active pill) -> DG yellow w/ black text */
+[data-brand="dollar_general"] .bg-violet-500,
+[data-brand="dollar_general"] .bg-violet-600 { background-color: var(--dg-yellow) !important; color: var(--dg-black) !important; }
+[data-brand="dollar_general"] .hover\:bg-violet-600:hover { background-color: var(--dg-yellow-dark) !important; }
+/* keep text dark on filled yellow even when class says text-white */
+[data-brand="dollar_general"] .bg-violet-500.text-white,
+[data-brand="dollar_general"] .bg-violet-600.text-white { color: var(--dg-black) !important; }
+/* active benchmark/agent pill: yellow tint + black text */
+[data-brand="dollar_general"] .bg-violet-100.text-violet-700 { background-color: var(--dg-yellow-tint) !important; color: var(--dg-black) !important; }
+
+/* Borders / rings -> DG yellow */
+[data-brand="dollar_general"] .border-violet-200,
+[data-brand="dollar_general"] .border-violet-500 { border-color: var(--dg-yellow) !important; }
+[data-brand="dollar_general"] .hover\:border-violet-300:hover,
+[data-brand="dollar_general"] .hover\:border-violet-400:hover { border-color: var(--dg-yellow-dark) !important; }
+[data-brand="dollar_general"] .ring-violet-400,
+[data-brand="dollar_general"] .ring-violet-500 { --tw-ring-color: var(--dg-yellow) !important; }

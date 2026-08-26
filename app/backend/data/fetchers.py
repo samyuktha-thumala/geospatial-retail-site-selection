@@ -2,6 +2,7 @@
 
 import logging
 import math
+import os
 from ..models import (
     LocationOut, CompetitorOut, HotspotOut, ClosureCandidateOut,
     ClosureMetric, DataSourceOut, DataSourceStat, ChartDataPoint,
@@ -79,6 +80,13 @@ def fetch_competitors() -> list[CompetitorOut]:
     ]
 
 
+# Dollar General demo mode: present the network as a purely rural expansion story.
+# When enabled, urban expansion candidates are dropped and suburban ones are
+# relabeled as rural. Gated by env var so the same codebase serves the standard
+# app unchanged. No underlying tables are modified.
+DG_RURAL_MODE = os.environ.get("DG_RURAL_MODE", "").lower() in ("1", "true", "yes")
+
+
 def fetch_hotspots() -> list[HotspotOut]:
     """Fetch expansion candidates as hotspots."""
     rows = sql.execute_sql(f"""
@@ -90,18 +98,24 @@ def fetch_hotspots() -> list[HotspotOut]:
         ORDER BY recommended_revenue DESC
     """, cache_key="hotspots")
 
-    return [
-        HotspotOut(
+    hotspots = []
+    for r in rows:
+        cat = (r.get('urbanicity_category') or 'suburban').lower().strip()
+        if DG_RURAL_MODE:
+            # Purely rural story: drop urban candidates, relabel suburban -> rural.
+            if cat != "suburban":
+                continue
+            cat = "rural"
+        hotspots.append(HotspotOut(
             id=f"HS{r['rank_id']}",
             lat=float(r['lat']),
             lng=float(r['lng']),
             score=round(min(100, float(r['recommended_revenue']) / 50000), 1),
             projected_sales=round(float(r['recommended_revenue']) / 12000, 1),
             format=StoreFormat(r.get('recommended_format', 'standard')),
-            urbanicity=_map_urbanicity(r.get('urbanicity_category', 'suburban')),
-        )
-        for r in rows
-    ]
+            urbanicity=_map_urbanicity(cat),
+        ))
+    return hotspots
 
 
 def fetch_closure_candidates() -> list[ClosureCandidateOut]:
@@ -330,9 +344,13 @@ def fetch_network_metrics() -> NetworkMetricsOut:
     store_count = int(rows[0]['store_count'] or 0) if rows else 0
 
     try:
+        # In DG rural mode, only the (relabeled) suburban candidates are surfaced,
+        # so network metrics must count the same subset for consistency.
+        exp_where = "WHERE LOWER(urbanicity_category) = 'suburban'" if DG_RURAL_MODE else ""
         exp_rows = sql.execute_sql(f"""
             SELECT COUNT(*) as cnt, SUM(recommended_revenue) / 1e6 as projected_rev
             FROM {sql.table('gold_expansion_candidates')}
+            {exp_where}
         """, cache_key="network_metrics_expansion")
         exp_count = int(exp_rows[0]['cnt'] or 0) if exp_rows else 0
         exp_rev = float(exp_rows[0]['projected_rev'] or 0) if exp_rows else 0
@@ -539,8 +557,9 @@ def fetch_h3_features(store_id: str) -> H3FeatureCollection:
     """Fetch H3 cells within a store's trade area with feature properties."""
     import json
 
-    # store_id comes as "LOC123" — extract the number
-    location_id = store_id.replace("LOC", "")
+    # store_id comes as "LOC123" or "ST1126" — extract the number
+    import re
+    location_id = re.sub(r'^[A-Za-z]+', '', store_id)
 
     rows = sql.execute_sql(f"""
         WITH iso AS (

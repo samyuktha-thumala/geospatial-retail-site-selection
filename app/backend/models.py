@@ -276,6 +276,8 @@ class AgentChatIn(BaseModel):
     message: str
     page_context: str = "expansion"  # "network" or "expansion"
     history: list[ChatHistoryMessage] = []
+    benchmark: Optional[str] = None
+    closure_candidates: list[str] = []
 
 
 class AgentChatOut(BaseModel):

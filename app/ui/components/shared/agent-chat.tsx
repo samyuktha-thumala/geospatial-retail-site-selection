@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Sparkles, MapPin } from "lucide-react";
+import { Send, Sparkles, MapPin, Bookmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, type AgentResponse, type ChatMapPoint } from "@/lib/api";
 import ReactMarkdown from "react-markdown";
@@ -18,7 +18,7 @@ function fmtRevenue(val: unknown): string {
   return `$${n.toFixed(0)}`;
 }
 
-function ResultCard({ point, index }: { point: ChatMapPoint; index: number }) {
+function ResultCard({ point, index, onClick }: { point: ChatMapPoint; index: number; onClick?: () => void }) {
   const props = point.properties || {};
   const str = (v: unknown) => (v != null ? String(v) : "");
   const format = str(props.format || props.recommended_format).toLowerCase();
@@ -28,10 +28,15 @@ function ResultCard({ point, index }: { point: ChatMapPoint; index: number }) {
   const urbanicity = str(props.urbanicity || props.urbanicity_category);
   const zip = str(props.zip_code);
 
+  const rank = props.rank != null ? Number(props.rank) : null;
+
   return (
-    <div className="flex items-start gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-2">
+    <div
+      className={cn("flex items-start gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-2", onClick && "cursor-pointer hover:border-violet-300 hover:bg-violet-50 transition-colors")}
+      onClick={onClick}
+    >
       <span className="text-[10px] font-bold text-slate-400 mt-0.5 w-4 shrink-0">
-        {index + 1}
+        {rank ?? index + 1}
       </span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 mb-0.5">
@@ -67,30 +72,55 @@ interface AgentChatProps {
   pageContext: "network" | "expansion";
   onMapPoints?: (points: AgentResponse["map_points"]) => void;
   onH3Trigger?: (storeId: string) => void;
+  onComparisonTrigger?: (storeA: string, storeB: string) => void;
+  onScenarioTrigger?: (payload: Record<string, unknown>) => void;
+  onLocationClick?: (point: ChatMapPoint) => void;
+  benchmark?: string;
+  closureCandidates?: string[];
   className?: string;
 }
 
-export function AgentChat({ pageContext, onMapPoints, onH3Trigger, className }: AgentChatProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      text:
-        pageContext === "network"
-          ? "I can help you analyze your NY State store network — performance, competitors, closure risks. What would you like to know?"
-          : "Tell me where in New York State you'd like to expand — a borough, city, or region — and I'll find the best candidate sites.",
-      suggestions:
-        pageContext === "network"
-          ? ["Top 10 stores by revenue", "Performance drivers in Manhattan", "Competitor density in Brooklyn"]
-          : ["Expand in NYC — top 10 sites", "Suburban sites in Westchester", "Best sites in Brooklyn by POI density"],
-    },
-  ]);
+function getWelcomeMessage(ctx: string): Message {
+  return {
+    id: "welcome",
+    role: "assistant",
+    text: ctx === "network"
+      ? "I can help you analyze your NY State store network — performance, competitors, closure risks. What would you like to know?"
+      : "Tell me where in New York State you'd like to expand — a borough, city, or region — and I'll find the best candidate sites.",
+    suggestions: ctx === "network"
+      ? ["Top 10 performers", "Bottom 10 performers", "What are the drivers of performance for the top 50% of locations?"]
+      : ["What are the best locations for expansion?", "Optimize network"],
+  };
+}
+
+function loadMessages(ctx: string): Message[] {
+  try {
+    const raw = sessionStorage.getItem(`agent-chat-${ctx}`);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Message[];
+      if (parsed.length > 0) return parsed;
+    }
+  } catch { /* ignore */ }
+  return [getWelcomeMessage(ctx)];
+}
+
+export function AgentChat({ pageContext, onMapPoints, onH3Trigger, onComparisonTrigger, onScenarioTrigger, onLocationClick, benchmark, closureCandidates, className }: AgentChatProps) {
+  const [messages, setMessages] = useState<Message[]>(() => loadMessages(pageContext));
+
+  // Persist messages to sessionStorage on change
+  useEffect(() => {
+    // Don't persist if only the welcome message
+    if (messages.length > 1) {
+      sessionStorage.setItem(`agent-chat-${pageContext}`, JSON.stringify(messages));
+    }
+  }, [messages, pageContext]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [savedBenchmarkId, setSavedBenchmarkId] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   const scroll = useCallback(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), []);
-  useEffect(() => scroll(), [messages, scroll]);
+  useEffect(() => { scroll(); }, [messages, scroll]);
 
   const handleSend = async (text?: string) => {
     const message = text ?? input.trim();
@@ -101,9 +131,26 @@ export function AgentChat({ pageContext, onMapPoints, onH3Trigger, className }: 
     setIsLoading(true);
 
     try {
-      const history = messages
+      let history = messages
         .filter((m) => m.id !== "welcome")
         .map((m) => ({ role: m.role, content: m.text }));
+
+      // For expansion context: inject network diagnostics history for cross-page context
+      if (pageContext === "expansion") {
+        try {
+          const networkRaw = sessionStorage.getItem("agent-chat-network");
+          if (networkRaw) {
+            const networkMsgs = JSON.parse(networkRaw) as Message[];
+            const networkHistory = networkMsgs
+              .filter((m) => m.id !== "welcome")
+              .slice(-10)
+              .map((m) => ({ role: m.role, content: m.text }));
+            if (networkHistory.length > 0) {
+              history = [...networkHistory, ...history];
+            }
+          }
+        } catch { /* ignore */ }
+      }
 
       // For expansion context: inject working set IDs from the last agent result
       let augmentedMessage = message;
@@ -119,7 +166,7 @@ export function AgentChat({ pageContext, onMapPoints, onH3Trigger, className }: 
         }
       }
 
-      const response: AgentResponse = await api.agentChat(augmentedMessage, pageContext, history);
+      const response: AgentResponse = await api.agentChat(augmentedMessage, pageContext, history, benchmark, closureCandidates);
 
       setMessages((prev) => [
         ...prev,
@@ -128,19 +175,43 @@ export function AgentChat({ pageContext, onMapPoints, onH3Trigger, className }: 
           role: "assistant",
           text: response.response,
           suggestions: response.suggestions,
-          mapPoints: response.map_points?.filter((p) => p.properties?.type !== "h3_trigger"),
+          mapPoints: response.map_points?.filter((p) => {
+            const t = p.properties?.type;
+            return t !== "h3_trigger" && t !== "comparison_trigger" && t !== "scenario_trigger";
+          }),
         },
       ]);
 
       if (response.map_points?.length) {
+        const triggerTypes = new Set(response.map_points.map((p) => p.properties?.type).filter(Boolean));
+
         // Check for H3 trigger
-        const h3Trigger = response.map_points.find((p) => p.properties?.type === "h3_trigger");
-        if (h3Trigger && onH3Trigger) {
-          onH3Trigger(h3Trigger.properties.store_id as string);
+        if (triggerTypes.has("h3_trigger")) {
+          const h3Trigger = response.map_points.find((p) => p.properties?.type === "h3_trigger");
+          if (h3Trigger && onH3Trigger) onH3Trigger(h3Trigger.properties.store_id as string);
         }
-        // Pass real map points (not h3 triggers) to parent
-        const realPoints = response.map_points.filter((p) => p.properties?.type !== "h3_trigger");
-        if (realPoints.length && onMapPoints) {
+        // Check for comparison trigger
+        if (triggerTypes.has("comparison_trigger")) {
+          const compTrigger = response.map_points.find((p) => p.properties?.type === "comparison_trigger");
+          if (compTrigger && onComparisonTrigger) {
+            onComparisonTrigger(compTrigger.properties.store_id_a as string, compTrigger.properties.store_id_b as string);
+          }
+        }
+        // Check for scenario triggers (may have multiple in one response)
+        if (triggerTypes.has("scenario_trigger") && onScenarioTrigger) {
+          const scenTriggers = response.map_points.filter((p) => p.properties?.type === "scenario_trigger");
+          for (const scenTrigger of scenTriggers) {
+            onScenarioTrigger(scenTrigger.properties as Record<string, unknown>);
+          }
+        }
+
+        // Pass real map points (not triggers) to parent — skip if any trigger present
+        const hasAnyTrigger = triggerTypes.has("h3_trigger") || triggerTypes.has("comparison_trigger") || triggerTypes.has("scenario_trigger");
+        const realPoints = response.map_points.filter((p) => {
+          const t = p.properties?.type;
+          return t !== "h3_trigger" && t !== "comparison_trigger" && t !== "scenario_trigger";
+        });
+        if (realPoints.length && onMapPoints && !hasAnyTrigger) {
           onMapPoints(realPoints);
         }
       }
@@ -174,9 +245,36 @@ export function AgentChat({ pageContext, onMapPoints, onH3Trigger, className }: 
               )}
             >
               {msg.role === "assistant" ? (
-                <div className="prose prose-xs prose-slate max-w-none [&_table]:hidden [&_p]:my-1 [&_strong]:text-slate-900 [&_ul]:my-1 [&_li]:my-0.5 [&_h1]:text-sm [&_h2]:text-xs [&_h3]:text-xs overflow-x-auto">
-                  <ReactMarkdown>{msg.text}</ReactMarkdown>
-                </div>
+                <>
+                  <div className="prose prose-xs prose-slate max-w-none [&_table]:text-[10px] [&_table]:w-full [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:font-semibold [&_th]:border-b [&_th]:border-slate-200 [&_td]:px-2 [&_td]:py-1 [&_td]:border-b [&_td]:border-slate-100 [&_p]:my-1 [&_strong]:text-slate-900 [&_ul]:my-1 [&_li]:my-0.5 [&_h1]:text-sm [&_h2]:text-xs [&_h3]:text-xs overflow-x-auto">
+                    <ReactMarkdown>{msg.text}</ReactMarkdown>
+                  </div>
+                  {msg.id !== "welcome" && pageContext === "network" && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Extract [BENCHMARK] line if present, otherwise use full text
+                        const benchmarkMatch = msg.text.match(/\[BENCHMARK\]\s*(.+)/);
+                        const summary = benchmarkMatch ? benchmarkMatch[1].trim() : msg.text;
+                        localStorage.setItem("site-selection-benchmark", JSON.stringify({
+                          text: msg.text,
+                          summary,
+                          savedAt: new Date().toISOString(),
+                        }));
+                        setSavedBenchmarkId(msg.id);
+                      }}
+                      className={cn(
+                        "mt-2 pt-2 border-t border-slate-200 flex items-center gap-1 text-[10px] w-full transition-colors",
+                        savedBenchmarkId === msg.id
+                          ? "text-violet-600 font-medium"
+                          : "text-slate-400 hover:text-violet-500"
+                      )}
+                    >
+                      <Bookmark size={10} />
+                      {savedBenchmarkId === msg.id ? "Saved as benchmark" : "Save as benchmark"}
+                    </button>
+                  )}
+                </>
               ) : (
                 msg.text
               )}
@@ -190,7 +288,7 @@ export function AgentChat({ pageContext, onMapPoints, onH3Trigger, className }: 
                   <span>{msg.mapPoints.length} locations on map</span>
                 </div>
                 {msg.mapPoints.slice(0, 15).map((pt, i) => (
-                  <ResultCard key={`${msg.id}-pt-${i}`} point={pt} index={i} />
+                  <ResultCard key={`${msg.id}-pt-${i}`} point={pt} index={i} onClick={onLocationClick ? () => onLocationClick(pt) : undefined} />
                 ))}
                 {msg.mapPoints.length > 15 && (
                   <div className="text-[10px] text-slate-400 px-1">

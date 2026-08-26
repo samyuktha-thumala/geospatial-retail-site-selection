@@ -1,5 +1,6 @@
 import { createFileRoute, Outlet, Link, useMatchRoute } from "@tanstack/react-router";
 import { Database, Map, Brain, Globe, FlaskConical, HelpCircle, Presentation } from "lucide-react";
+import { useBrand } from "@/lib/brand";
 
 const navItems = [
   { to: "/network-diagnostics" as const, label: "Network Diagnostics", icon: Map },
@@ -14,6 +15,8 @@ export const Route = createFileRoute("/_sidebar")({
 
 function TopNavLayout() {
   const matchRoute = useMatchRoute();
+  const brand = useBrand();
+  const isDG = brand.id === "dollar_general";
 
   return (
     <div className="flex flex-col h-screen bg-slate-50">
@@ -21,10 +24,19 @@ function TopNavLayout() {
       <header className="relative flex items-center justify-between bg-slate-900 px-8 h-14 shrink-0 shadow-md">
         {/* Brand */}
         <div className="flex items-center gap-3">
-          <Globe size={22} className="text-red-500" strokeWidth={2.5} />
-          <h1 className="text-base font-bold text-white tracking-tight">Retail SiteLab</h1>
+          {isDG ? (
+            <span
+              className="flex items-center justify-center rounded-md font-extrabold tracking-tight"
+              style={{ background: brand.badgeBg, color: brand.badgeText, width: 30, height: 30, fontSize: 13 }}
+            >
+              {brand.badge}
+            </span>
+          ) : (
+            <Globe size={22} className="text-red-500" strokeWidth={2.5} />
+          )}
+          <h1 className="text-base font-bold text-white tracking-tight">{brand.name}</h1>
           <div className="w-px h-5 bg-slate-700" />
-          <span className="text-sm text-slate-400 hidden sm:inline">Site Selection for Strategic Expansion</span>
+          <span className="text-sm text-slate-400 hidden sm:inline">{brand.tagline}</span>
         </div>
 
         {/* Nav — centered */}
@@ -38,9 +50,10 @@ function TopNavLayout() {
                 to={item.to}
                 className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                   isActive
-                    ? "bg-blue-600 text-white"
+                    ? "text-white"
                     : "text-slate-300 hover:bg-slate-800 hover:text-white"
                 }`}
+                style={isActive ? { background: brand.accent, color: brand.accentText } : undefined}
               >
                 <Icon size={16} />
                 <span>{item.label}</span>

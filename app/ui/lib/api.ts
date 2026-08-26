@@ -307,10 +307,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ message, context, history: history || [], conversation_id: conversationId }),
     }),
-  agentChat: (message: string, pageContext: string, history?: Array<{role: string; content: string}>) =>
+  agentChat: (message: string, pageContext: string, history?: Array<{role: string; content: string}>, benchmark?: string, closureCandidates?: string[]) =>
     fetchJson<AgentResponse>("/agent/chat", {
       method: "POST",
-      body: JSON.stringify({ message, page_context: pageContext, history: history || [] }),
+      body: JSON.stringify({ message, page_context: pageContext, history: history || [], benchmark: benchmark || null, closure_candidates: closureCandidates || [] }),
     }),
   listIsochrones: () => fetchJson<Isochrone[]>("/isochrones"),
   getH3Features: (storeId: string) => fetchJson<H3FeatureCollection>(`/h3-features/${storeId}`),

@@ -10,12 +10,16 @@ command:
 
 env:
   - name: APP_ENV
-    value: "production"
+    value: "dev"
   - name: DATABRICKS_WAREHOUSE_ID
-    value: "YOUR_WAREHOUSE_ID"       # <- your SQL warehouse ID
+    value: "148ccb90800933a1"
   - name: DATABRICKS_CATALOG
-    value: "YOUR_CATALOG"            # <- your Unity Catalog name
+    value: "smthumala_catalog"
   - name: DATABRICKS_SCHEMA
-    value: "YOUR_SCHEMA"             # <- schema where tables live
+    value: "site_selection"
   - name: GENIE_SPACE_ID
-    value: "YOUR_GENIE_SPACE_ID"     # <- Genie space ID for the chatbot
+    value: "01f11e5c69071fb08d1596cc4adf59fa"
+  - name: SERVING_ENDPOINT
+    value: "databricks-claude-sonnet-4-6"
+  - name: CHAT_ENDPOINT
+    value: "databricks-gemini-2-5-flash"

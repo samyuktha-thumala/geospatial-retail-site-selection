@@ -17,24 +17,45 @@ variables:
   genie_space_id:
     description: "Genie Space ID for the chatbot"
     default: ""
+  app_name:
+    description: "Databricks App resource name"
+    default: "site-selection-${bundle.target}"
+  app_brand:
+    description: "Runtime UI brand (default | dollar_general)"
+    default: "default"
+  rural_mode:
+    description: "Purely-rural expansion demo mode (true to enable)"
+    default: "false"
 
 targets:
   dev:
     default: true
     mode: development
     workspace:
-      profile: YOUR_PROFILE    # <- set to your Databricks CLI profile
+      profile: YOUR_PROFILE
     variables:
       warehouse_id: "YOUR_WAREHOUSE_ID"
       catalog: "YOUR_CATALOG"
       schema: "YOUR_SCHEMA"
       genie_space_id: "YOUR_GENIE_SPACE_ID"
-  prod:
-    mode: production
+  aws:
     workspace:
-      profile: YOUR_PROFILE    # <- set to your Databricks CLI profile
+      profile: e2-demo-west
     variables:
-      warehouse_id: "YOUR_WAREHOUSE_ID"
-      catalog: "YOUR_CATALOG"
-      schema: "YOUR_SCHEMA"
-      genie_space_id: "YOUR_GENIE_SPACE_ID"
+      warehouse_id: "75fd8278393d07eb"
+      catalog: "retail_consumer_goods"
+      schema: "geospatial_site_selection"
+      genie_space_id: "01f11e6d1f1115a6b613af7c004b53dc"
+  dg:
+    # Dollar General rural-expansion demo. Same source + data as `aws`,
+    # rebranded and filtered to a purely-rural story via runtime env vars.
+    workspace:
+      profile: e2-demo-west
+    variables:
+      warehouse_id: "75fd8278393d07eb"
+      catalog: "retail_consumer_goods"
+      schema: "geospatial_site_selection"
+      genie_space_id: "01f11e6d1f1115a6b613af7c004b53dc"
+      app_name: "dollar-general-site-selection"
+      app_brand: "dollar_general"
+      rural_mode: "true"

@@ -1,0 +1,41 @@
+v0: 
+
+1. How many business out there with physical footprint (Retail) - [get this number] much more in other industries
+2. The cost of bad decisions is expensive to reverse — a single failed location can cost your business up to $5 Million. 
+3. It is super important to get your locations in the right place 
+4. Challenges: Data Silos, and let us walk through what happens in the industry and how it affects a business
+4.1 [Need to create visuals for this and get logos] Site Selection Process Today: 
+4.1.1 You have data coming in from multiple sources 
+        demographics / pysographics - 
+                A. census (this data is at a census block group level)
+                B. ESRI (this data is at Census block level)
+        foot traffic data from Placer.ai (location level)
+        competition - OSM (location level, but you need to extract it from my nodes)/agg data (location level)
+        Road network - ESRI /custom build on python (Graph)
+4.1.2 I need to combine this data for my analysis
+        Do I choose ESRI? Then I need to manually bring in all my other data sources to this system
+        Do I use custom python scripts? Great! Then you need to manually bring the data I need from ESRI outside of it. (Cannot move raw data outside of ESRI - So some processing happens here: Service Areas, and then extract B. If you do this, do not be surprised if you are hit with additional per seat licenses)
+    Imagine you got all the data to a single platform: 
+        Standardization Layer - I need to aggregate all my data at the store service area level. Computationally expensive task - Spatial Joins
+        You can bring this to your custom notebooks and standardize on H3 level.
+4.1.3 You run predictive modeling on your current network to understand your drivers of performance. You feature engineer for this
+4.1.4 Redo this whole process for seed points (which are at least 20x the number of locations you have) and run inference
+4.1.5 You have 8000 locations that you could expand to - But this doesn't make sense. You need to optimize your network, so you are not cannibalizing into your own network sales
+4.1.6 In an aggressive scenario end up with 400 locations. Business users say, nope, I want to open more locations, so you keep going back and forth and land at 800 locations. 
+4.1.7 Send them a list of locations in an excel for them to do. And they have no idea what data you used, cannot interact with it etc. 
+Is this the process you want for a key business decision? What if your business users needed it on a map, you build a dashboard, what if they had additional questions?
+5. I think the limitations are clear. Data is siloed, geospatial operations are computationally expensive, business decisions need flexibility and scenario modeling
+6. Let's look at this on databricks: 
+
+
+
+On databricks
+
+- Connectors, MarketPlace, Connect to your ArcGIS online account to bring your data seamlessly into databricks (Still specify the different granularity of data)
+- Standardize to H3 Spatial Indexing + Spatial SQL (Optimized for spark?)
+- Use External API / Install a Routing Engine to run your routing
+- Aggregate from H3 indices to Trade Area (Skip Spatial Joins)
+- Feature Engineer - Build geographic features distances from comeptition with H3 K ring
+- ML modeling - ML Flow + UC registry
+- Databricks Apps + Lakebase (PostGIS, so can hold your geospatial data)
+- Foundational models for your chat to talk to your data

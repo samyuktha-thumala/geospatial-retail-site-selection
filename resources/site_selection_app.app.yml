@@ -1,7 +1,7 @@
 resources:
   apps:
     site_selection_app:
-      name: site-selection-${bundle.target}
+      name: ${var.app_name}
       description: "Retail Site Selection Platform for Strategic Expansion"
       source_code_path: ../app
       config:
@@ -16,6 +16,14 @@ resources:
             value: ${var.schema}
           - name: GENIE_SPACE_ID
             value: ${var.genie_space_id}
+          - name: SERVING_ENDPOINT
+            value: "databricks-claude-sonnet-4-6"
+          - name: CHAT_ENDPOINT
+            value: "databricks-gemini-2-5-flash"
+          - name: APP_BRAND
+            value: ${var.app_brand}
+          - name: DG_RURAL_MODE
+            value: ${var.rural_mode}
       resources:
         - name: genie-space
           genie_space:
@@ -29,5 +37,5 @@ resources:
             permission: CAN_USE
         - name: serving-endpoint
           serving_endpoint:
-            name: "YOUR_SERVING_ENDPOINT"  # <- your Foundation Model API serving endpoint
+            name: "databricks-claude-sonnet-4-6"
             permission: CAN_QUERY

@@ -6,8 +6,8 @@ from databricks.sdk import WorkspaceClient
 
 logger = logging.getLogger(__name__)
 
-import os
-ENDPOINT_NAME = os.environ.get("SERVING_ENDPOINT", "YOUR_SERVING_ENDPOINT")
+from ..config import conf
+ENDPOINT_NAME = conf.chat_endpoint
 
 # Maximum number of tool-call round trips before forcing a text reply
 MAX_TOOL_ROUNDS = 3

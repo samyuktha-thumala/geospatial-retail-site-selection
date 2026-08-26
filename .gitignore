@@ -37,6 +37,7 @@ uv.lock
 .mcp.json
 .claude/
 .github/
+.isaac/
 
 # Local docs
 IMPLEMENTATION_PLAN.md

@@ -4,6 +4,15 @@
 
 The entire pipeline - from Census data ingestion to H3 hexagonal analysis to XGBoost revenue prediction - runs on Databricks with Unity Catalog governance. The app itself is a full-stack Databricks App with a FastAPI backend and React frontend, deployed via Databricks Asset Bundles.
 
+> [!IMPORTANT]
+> **Sample app out of the box, full experience after setup.** If you deploy this
+> without configuring anything, the app runs as a **self-contained sample** on
+> **synthetic data** — the maps, hexes, and store network are illustrative only, and
+> the AI features (Site Agent, Genie Q&A) will not work. To get the **full
+> experience with real data**, you must complete the [configuration](#2-configure-databricks)
+> (SQL Warehouse, Unity Catalog, Genie Space, and Foundation Model endpoints) **and**
+> [run the data pipelines](#3-run-the-data-pipeline).
+
 ---
 
 ![Architecture](docs/architecture.png)
@@ -55,18 +64,32 @@ cd geospatial-retail-site-selection
 
 ### 2. Configure Databricks
 
-There are two bundles and one app config to update. All use placeholder values (`YOUR_*`) - just replace them with your own.
+There are two bundles to update: `databricks.yml` (the app) and `pipelines/databricks.yml`
+(the data pipeline). Replace every `YOUR_*` placeholder with your own values.
 
-**`databricks.yml`** (app bundle) - set your CLI profile:
+> **Which file holds the app config?** When you **deploy with Asset Bundles**
+> (the normal path, §4), the app's environment is built from the `dev` target
+> variables in **`databricks.yml`** — `app/app.yaml` is used only when you [run
+> locally](#5-run-locally-optional). So set the values below in `databricks.yml`,
+> not `app/app.yaml`.
+
+**`databricks.yml`** (app bundle) — set your CLI profile and the `dev` target variables:
 
 ```yaml
 targets:
   dev:
+    default: true
+    mode: development
     workspace:
-      profile: YOUR_PROFILE       # ← databricks auth profiles
+      profile: YOUR_PROFILE                 # ← databricks auth profiles
+    variables:
+      warehouse_id: "YOUR_WAREHOUSE_ID"     # ← from the SQL Warehouses page
+      catalog: "YOUR_CATALOG"               # ← Unity Catalog name
+      schema: "YOUR_SCHEMA"                 # ← schema to create tables in
+      genie_space_id: "YOUR_GENIE_SPACE_ID" # ← see "Genie Space" below
 ```
 
-**`pipelines/databricks.yml`** (pipeline bundle) - set your CLI profile, catalog, schema, and Census API key:
+**`pipelines/databricks.yml`** (pipeline bundle) — set your CLI profile, catalog, schema, and Census API key:
 
 ```yaml
 targets:
@@ -80,21 +103,34 @@ targets:
       cluster_id: "xxxx-xxxxxx"   # ← cluster with GDAL/pyosmium (for 2 bronze tasks)
 ```
 
-**`app/app.yaml`** - set your SQL Warehouse ID and catalog/schema:
+#### Genie Space (required for the AI Site Agent)
 
-```yaml
-env:
-  - name: DATABRICKS_WAREHOUSE_ID
-    value: "your-warehouse-id"    # ← from SQL Warehouses page
-  - name: DATABRICKS_CATALOG
-    value: "your_catalog"         # ← same as above
-  - name: DATABRICKS_SCHEMA
-    value: "your_schema"          # ← same as above
-```
+The AI Site Agent and natural-language Q&A are powered by a
+[Genie Space](https://docs.databricks.com/en/genie/index.html). Create one over your
+catalog/schema, then copy its **Space ID** (the last path segment of the Genie Space
+URL) into `genie_space_id` above. Without it, the map and analytics still work, but
+the AI features will not.
+
+#### Foundation Model endpoints (required for the AI features)
+
+The app calls two Databricks Foundation Model API endpoints, configured in
+`resources/site_selection_app.app.yml`:
+
+| Env var | Default endpoint | Used for |
+|---------|------------------|----------|
+| `SERVING_ENDPOINT` | `databricks-claude-sonnet-4-6` | Site Agent reasoning |
+| `CHAT_ENDPOINT` | `databricks-gemini-2-5-flash` | Chat responses |
+
+These pay-per-token endpoints must exist and be enabled in your workspace/region.
+Check under **Serving → Endpoints**; if yours have different names (or your region
+offers different models), update the two `value:` fields in
+`resources/site_selection_app.app.yml` to match.
 
 ### 3. Run the data pipeline
 
-> **Note:** The app works without running the pipeline - it falls back to synthetic data. Run the pipeline only if you want real data in your catalog.
+> **Note:** Without the pipeline, the app runs as a **sample on synthetic data** (see
+> the callout at the top). Run these pipelines to populate your catalog with **real
+> data** and get the full experience.
 
 **Prerequisites:**
 - Create a catalog and schema in Unity Catalog: `CREATE CATALOG my_catalog; USE CATALOG my_catalog; CREATE SCHEMA my_schema;`
@@ -171,6 +207,9 @@ Set `DATABRICKS_PROFILE=YOUR_PROFILE` to connect to a live workspace instead.
 ## Project Structure
 
 ```
+├── .claude/
+│   └── skills/
+│       └── geospatial-databricks/  # Reusable geospatial-on-Databricks patterns (see below)
 ├── databricks.yml                  # DABs bundle config (app deployment)
 ├── resources/
 │   └── site_selection_app.app.yml  # Databricks App resource
@@ -199,3 +238,43 @@ Set `DATABRICKS_PROFILE=YOUR_PROFILE` to connect to a live workspace instead.
             ├── components/         # Maps, panels, shared components
             └── lib/                # API client, utilities
 ```
+
+---
+
+## Geospatial patterns (Claude Code skill)
+
+The hard-won geospatial lessons from building this pipeline are captured as a
+[Claude Code skill](.claude/skills/geospatial-databricks/SKILL.md) so they can be
+reused on other Databricks spatial work. It auto-loads when you work in this repo
+(or invoke `/geospatial-databricks`), and covers both the general principles of
+scalable spatial analysis and their Databricks specifics:
+
+- **Spatial joins** — making the indexed `PhotonShuffledSpatialJoin` (SSJ) fire
+  instead of a brute-force N×M join (DBR 18.x, dropping `BROADCAST`, the
+  equi-key/CTE gotcha), plus the Sedona fallback and planar vs WGS84 coordinates
+- **H3 indexing** — grid generation, H3-as-join-key, resolution selection,
+  point-in-polygon, area-weighted interpolation, and k-ring distance features
+- **Gotchas** — SRID 4326, `ST_Area` units, serverless geometry-collection crashes,
+  census null sentinels/top-coding, OSM PBF batched extraction, isochrone retries
+- **Inline visualization** — converting geometry/H3 for pydeck/folium in notebooks
+
+References live alongside it: `references/sql-function-reference.md` (ST_*/h3_*
+cheat sheet + SSJ plan-reading) and `references/ingestion-pipelines.md`
+(census/OSM/Valhalla ingestion + the GeoPandas↔Spark bridge).
+
+---
+
+## 📜 License
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
+
+## 🆘 Support
+
+This project is provided for exploration and demonstration only. It is not
+formally supported by Databricks under any Service Level Agreement (SLA), is
+provided AS-IS, and carries no guarantees of any kind. Please do not file a
+Databricks support ticket for issues arising from its use. Any issues discovered
+should be filed as GitHub Issues on this repository; they will be reviewed as
+time permits, but there are no formal SLAs for support.
+
+© 2026 Databricks, Inc. All rights reserved.

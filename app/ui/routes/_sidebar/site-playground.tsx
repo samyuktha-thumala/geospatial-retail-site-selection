@@ -47,8 +47,18 @@ function SitePlaygroundPage() {
   const [closureCandidates, setClosureCandidates] = useState<ClosureCandidate[]>([]);
   const [isochrones, setIsochrones] = useState<Isochrone[]>([]);
   const [networkMetrics, setNetworkMetrics] = useState<NetworkMetrics | null>(null);
-  const [scenarios, setScenarios] = useState<SavedScenario[]>([]);
-  const [activeScenarioId, setActiveScenarioId] = useState<string | null>(null);
+  const [scenarios, setScenarios] = useState<SavedScenario[]>(() => {
+    try {
+      const raw = sessionStorage.getItem("site-selection-scenarios");
+      if (raw) return JSON.parse(raw);
+    } catch { /* ignore */ }
+    return [];
+  });
+  const [activeScenarioId, setActiveScenarioId] = useState<string | null>(() => {
+    try {
+      return sessionStorage.getItem("site-selection-active-scenario") || null;
+    } catch { return null; }
+  });
   const [loading, setLoading] = useState(true);
   const [simulating, setSimulating] = useState(false);
   const [savingScenarioId, setSavingScenarioId] = useState<string | null>(null);
@@ -74,6 +84,20 @@ function SitePlaygroundPage() {
   const [agentPoints, setAgentPoints] = useState<AgentResponse["map_points"]>([]);
   const [agentOnlyMap, setAgentOnlyMap] = useState(false);
 
+  // Persist scenarios to sessionStorage
+  useEffect(() => {
+    if (scenarios.length > 0) {
+      sessionStorage.setItem("site-selection-scenarios", JSON.stringify(scenarios));
+    }
+  }, [scenarios]);
+  useEffect(() => {
+    if (activeScenarioId) {
+      sessionStorage.setItem("site-selection-active-scenario", activeScenarioId);
+    } else {
+      sessionStorage.removeItem("site-selection-active-scenario");
+    }
+  }, [activeScenarioId]);
+
   const [layers, setLayers] = useState<MapLayer[]>([
     { id: "express", label: "Express", enabled: true, color: "#3b82f6", size: "sm" },
     { id: "standard", label: "Standard", enabled: true, color: "#3b82f6", size: "md" },
@@ -82,7 +106,7 @@ function SitePlaygroundPage() {
     { id: "competitors", label: "Competitors", enabled: true, color: "#ef4444" },
     { id: "hotspots", label: "Hotspots", enabled: true, color: "#fbbf24" },
     { id: "closureRisks", label: "At Risk", enabled: true, color: "#f97316", icon: "!" },
-    { id: "finalLocations", label: "Optimized", enabled: false, color: "#10b981" },
+    { id: "finalLocations", label: "Optimized", enabled: !!sessionStorage.getItem("site-selection-active-scenario"), color: "#10b981" },
     { id: "userLocations", label: "User Added", enabled: false, color: "#22d3ee" },
   ]);
 
@@ -162,6 +186,44 @@ function SitePlaygroundPage() {
       setSimulating(false);
     }
   }, [removedStoreIds, userLocations]);
+
+  const handleScenarioTrigger = useCallback((payload: Record<string, unknown>) => {
+    const result = payload.result as SimulationResult;
+    const netDist = payload.min_distance_from_network as { urban: number; suburban: number; rural: number } || { urban: 1.5, suburban: 3, rural: 5 };
+    const newDist = payload.min_distance_between_new as { urban: number; suburban: number; rural: number } || { urban: 2, suburban: 5, rural: 8 };
+    const excludedList = (payload.excluded_closure_risks as string[]) || [];
+    const compYear = (payload.competitor_year as number) || 2025;
+
+    const id = `SA${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const parts = [`${result.optimized_locations.length} locations`];
+    if (excludedList.length) parts.push(`excl. ${excludedList.length} at-risk`);
+    if (payload.urbanicity_focus) parts.push(`${payload.urbanicity_focus} focus`);
+    if (compYear !== 2025) parts.push(`Year ${compYear}`);
+    const title = `Agent: ${parts.join(" · ")}`;
+
+    const scenario: SavedScenario = {
+      id,
+      title,
+      timestamp: new Date().toLocaleTimeString(),
+      params: {
+        competitorYear: compYear,
+        minDistanceFromNetwork: netDist,
+        minDistanceBetweenNew: newDist,
+        finalLocationsCount: (payload.final_locations_count as number) || 10,
+        excludedCount: excludedList.length,
+        removedCount: removedStoreIds.size,
+        addedCount: userLocations.length,
+      },
+      result,
+      collapsed: false,
+    };
+
+    setScenarios((prev) => [...prev.map((s) => ({ ...s, collapsed: true })), scenario]);
+    setActiveScenarioId(id);
+    setAgentOnlyMap(false);
+    setLayers((prev) => prev.map((l) => l.id === "finalLocations" ? { ...l, enabled: true } : l));
+    if (compYear !== currentYear) setCurrentYear(compYear);
+  }, [removedStoreIds, userLocations, currentYear]);
 
   const handleAddLocation = () => {
     const lat = Number(latInput);
@@ -388,6 +450,27 @@ function SitePlaygroundPage() {
         <MetricCard label="Revenue Uplift" value={activeScenario ? `+${activeScenario.result.network_revenue_change}%` : "—"} />
         <MetricCard label="New Locations" value={activeScenario ? String(activeScenario.result.optimized_locations.length) : "0"} />
       </div>
+      {/* Benchmark from Network Diagnostics */}
+      {(() => {
+        try {
+          const raw = localStorage.getItem("site-selection-benchmark");
+          if (!raw) return null;
+          const { summary } = JSON.parse(raw);
+          if (!summary) return null;
+          return (
+            <div className="flex items-center gap-2 mx-6 mb-2 px-4 py-2 bg-violet-50 border border-violet-200 rounded-lg">
+              <Sparkles size={12} className="text-violet-500 shrink-0" />
+              <p className="text-[11px] text-violet-800 flex-1"><span className="font-semibold">Benchmark:</span> {summary}</p>
+              <button
+                onClick={() => { localStorage.removeItem("site-selection-benchmark"); window.location.reload(); }}
+                className="text-violet-400 hover:text-violet-600 text-[10px] shrink-0"
+              >
+                ✕
+              </button>
+            </div>
+          );
+        } catch { return null; }
+      })()}
 
       {/* Map + Scenario Panel side by side — fixed height, never shrinks */}
       <div className="flex gap-3 mx-6 mb-2 shrink-0" style={{ height: "calc(100vh - 200px)", minHeight: "500px" }}>
@@ -482,6 +565,9 @@ function SitePlaygroundPage() {
             <AgentChat
               pageContext="expansion"
               onMapPoints={(pts) => { setAgentPoints(pts); setAgentOnlyMap(true); }}
+              onScenarioTrigger={handleScenarioTrigger}
+              benchmark={(() => { try { const r = localStorage.getItem("site-selection-benchmark"); return r ? JSON.parse(r).summary : undefined; } catch { return undefined; } })()}
+              closureCandidates={closureCandidates.map((cc) => cc.id)}
               className="flex-1 min-h-0 border-0 shadow-none rounded-none"
             />
           </div>
@@ -581,13 +667,6 @@ function SitePlaygroundPage() {
                 <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">
                   Changes ({userLocations.length + removedStoreIds.size})
                 </p>
-                <button
-                  onClick={() => alert("Save functionality coming soon")}
-                  className="flex items-center gap-0.5 text-[10px] text-blue-600 hover:text-blue-800 font-medium"
-                >
-                  <Save size={9} />
-                  Save
-                </button>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {/* Added locations */}

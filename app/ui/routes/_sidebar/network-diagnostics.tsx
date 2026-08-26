@@ -53,7 +53,7 @@ function NetworkDiagnosticsPage() {
 
   // Agent map points
   const [agentPoints, setAgentPoints] = useState<AgentResponse["map_points"]>([]);
-  const [agentOnlyMap, setAgentOnlyMap] = useState(false);
+
 
   // Right panel state
   const [storeSearch, setStoreSearch] = useState("");
@@ -354,32 +354,16 @@ function NetworkDiagnosticsPage() {
           <h3 className="text-base font-bold text-slate-900 mb-1.5">Network Map <span className="text-sm font-normal text-slate-400">— What's driving your locations' performance</span></h3>
           <div data-tour="network-map" className="flex-1 rounded-lg overflow-hidden border border-slate-200 relative">
           <NetworkMap
-            locations={agentOnlyMap ? (() => {
-              // Filter existing store dots to only those matching agent results
-              const agentLabels = new Set(agentPoints.map(p => p.label));
-              const agentNames = new Set(agentPoints.map(p => p.label));
-              const matched = locations.filter(l => agentLabels.has(l.id) || agentNames.has(l.name));
-              return matched.length > 0 ? matched : locations;
-            })() : locations}
-            competitors={agentOnlyMap ? (() => {
-              const agentLabels = new Set(agentPoints.map(p => p.label));
-              const matched = competitors.filter(c => agentLabels.has(c.id));
-              return matched.length > 0 ? matched : [];
-            })() : competitors}
-            closureCandidates={agentOnlyMap ? [] : closureCandidates}
-            isochrones={agentOnlyMap ? [] : isochrones}
-            selectedLocationIds={agentOnlyMap ? new Set() : selectedLocationIds}
+            locations={locations}
+            competitors={competitors}
+            closureCandidates={closureCandidates}
+            isochrones={isochrones}
+            selectedLocationIds={selectedLocationIds}
             onSelectLocations={handleSelectLocations}
-            h3Data={agentOnlyMap ? null : h3Data}
+            h3Data={h3Data}
             h3Metric={h3Metric}
             filter={filter}
-            agentPoints={(() => {
-              // Only show purple diamonds for points that DON'T match existing stores or competitors
-              const storeNames = new Set(locations.map(l => l.name));
-              const storeIds = new Set(locations.map(l => l.id));
-              const compIds = new Set(competitors.map(c => c.id));
-              return agentPoints.filter(p => !storeNames.has(p.label) && !storeIds.has(p.label) && !compIds.has(p.label));
-            })()}
+            agentPoints={[]}
           />
           {/* Filter bar at bottom of map */}
           <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[1000] bg-white/90 backdrop-blur border border-slate-200 rounded-lg px-1 py-0.5 shadow-sm flex items-center gap-0.5">
@@ -398,6 +382,13 @@ function NetworkDiagnosticsPage() {
               </button>
             ))}
           </div>
+          {/* Zoom out button — always visible on map */}
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent("map-zoom-out"))}
+            className="absolute bottom-10 right-3 z-[1000] bg-white/90 backdrop-blur border border-slate-200 rounded-md px-2.5 py-1.5 text-[10px] font-medium text-slate-600 hover:text-slate-900 hover:bg-white shadow-sm transition-colors"
+          >
+            Zoom to NY
+          </button>
           {/* H3 metric selector — visible on map when single location selected */}
           {(h3Data || h3Loading) && (
             <div className="absolute top-3 right-14 z-[1000] bg-white/90 backdrop-blur border border-slate-200 rounded-lg px-3 py-2 shadow-sm">
@@ -437,7 +428,7 @@ function NetworkDiagnosticsPage() {
             ]).map(({ key, label, icon: Icon, accent }) => (
               <button
                 key={key}
-                onClick={() => { setPanelSection(key); if (key !== "agent") { setAgentOnlyMap(false); } }}
+                onClick={() => setPanelSection(key)}
                 className={`flex-1 flex items-center justify-center gap-1 px-2 py-2 text-[10px] font-medium transition-colors ${
                   panelSection === key
                     ? accent ? "text-violet-700 border-b-2 border-violet-500 bg-violet-50" : "text-slate-900 border-b-2 border-slate-800"
@@ -613,38 +604,26 @@ function NetworkDiagnosticsPage() {
 
             {/* Agent Chat — always mounted, hidden when other tab active */}
             <div className={panelSection === "agent" ? "flex flex-col h-full" : "hidden"}>
-                {agentPoints.length > 0 && (
-                  <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-100 shrink-0">
-                    <label className="flex items-center gap-1.5 text-[10px] text-slate-500 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={agentOnlyMap}
-                        onChange={(e) => setAgentOnlyMap(e.target.checked)}
-                        className="rounded border-slate-300 text-violet-500 focus:ring-violet-400 w-3 h-3"
-                      />
-                      Agent results only
-                    </label>
-                    <button
-                      onClick={() => {
-                        // Just zoom out to NY state level — keep agent points visible
-                        const map = document.querySelector('[data-tour="network-map"]');
-                        if (map) {
-                          // Dispatch a custom event the map listens for
-                          window.dispatchEvent(new CustomEvent("map-zoom-out"));
-                        }
-                      }}
-                      className="text-[10px] text-blue-500 hover:text-blue-700 font-medium ml-auto"
-                    >
-                      Zoom out
-                    </button>
-                  </div>
-                )}
                 <AgentChat
                   pageContext="network"
-                  onMapPoints={(pts) => { setAgentPoints(pts); setAgentOnlyMap(true); }}
+                  onMapPoints={(pts) => { setAgentPoints(pts); setPanelSection("agent"); }}
                   onH3Trigger={(storeId) => {
+                    setAgentPoints((prev) => prev.length ? prev : []);
                     setSelectedLocationIds(new Set([storeId]));
-                    setAgentOnlyMap(false);
+                    setPanelSection("agent");
+                  }}
+                  onComparisonTrigger={(storeA, storeB) => {
+                    setSelectedLocationIds(new Set([storeA]));
+                    setPanelSection("agent");
+                  }}
+                  onLocationClick={(pt) => {
+                    const storeNum = String(pt.properties?.store_number || "");
+                    const matchedLoc = locations.find(l => l.name === pt.label || l.id === `LOC${storeNum}`);
+                    if (matchedLoc) {
+                      handlePanelSelect(matchedLoc.id);
+                    } else if (storeNum) {
+                      setSelectedLocationIds(new Set([`LOC${storeNum}`]));
+                    }
                   }}
                   className="border-0 shadow-none rounded-none flex-1 min-h-0"
                 />
